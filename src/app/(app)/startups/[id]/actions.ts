@@ -244,20 +244,27 @@ const RESEARCH_DEPTH_CONFIG: Record<
 // deliberately uncapped for extended, whose whole instruction is "more if
 // your research turned up that much" - a hard ceiling there would undercut
 // the one depth actually meant to be open-ended.
+//
+// Enforced by slicing the response in enrichStartup, not by a `maxItems`
+// keyword on the schema below - Anthropic's structured-output schema
+// validator rejects `maxItems` on array properties outright ("property
+// 'maxItems' is not supported"), confirmed live against the real API, not
+// assumed. A prose count in the description alone is what caused the
+// original overrun (see the depth config above), so the cap still has to
+// be a hard one - it just has to be applied after the response comes back
+// instead of inside the schema itself.
 const FINDINGS_MAX: Partial<Record<ResearchDepth, number>> = {
   fast: 3,
   medium: 6,
 };
 
 function buildEnrichmentSchema(depth: ResearchDepth) {
-  const maxItems = FINDINGS_MAX[depth];
   return {
     type: "object",
     properties: {
       findings: {
         type: "array",
         description: `The decision-relevant facts found via public web search, ranked most important first - drawn from whichever of funding, founder background, recent news, and competitors actually turned up real information. ${RESEARCH_DEPTH_CONFIG[depth].findingsCount} findings. Skip categories you found nothing on rather than padding the list.`,
-        ...(maxItems ? { maxItems } : {}),
         items: {
           type: "object",
           properties: {
@@ -1471,9 +1478,14 @@ export async function enrichStartup(
     }
   }
 
-  const verifiedFindings: KeyFinding[] = parsed.findings.filter((finding) =>
-    verifiedUrls.has(finding.url)
-  );
+  // The schema can no longer enforce the count itself (see FINDINGS_MAX
+  // above), so it's capped here instead - after verification, not before,
+  // so a low-confidence finding that fails the URL check doesn't take a
+  // slot from a real one further down the model's own ranked list.
+  const findingsMax = FINDINGS_MAX[depth];
+  const verifiedFindings: KeyFinding[] = parsed.findings
+    .filter((finding) => verifiedUrls.has(finding.url))
+    .slice(0, findingsMax ?? Infinity);
 
   const summaryText =
     verifiedFindings.length > 0
