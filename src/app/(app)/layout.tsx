@@ -17,7 +17,11 @@ export default async function AppLayout({
   } = await supabase.auth.getUser();
 
   const { data: profile } = user
-    ? await supabase.from("users").select("role").eq("id", user.id).maybeSingle()
+    ? await supabase
+        .from("users")
+        .select("role, tour_completed")
+        .eq("id", user.id)
+        .maybeSingle()
     : { data: null };
   const isAdmin = profile?.role === "admin";
 
@@ -157,7 +161,7 @@ export default async function AppLayout({
             it no matter what a descendant's own CSS says). */}
         <MascotMobileButton />
 
-        <ProductTour />
+        <ProductTour initialCompleted={profile?.tour_completed ?? true} />
       </div>
     </MascotProvider>
   );

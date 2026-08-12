@@ -55,6 +55,7 @@ export interface Database {
           team_id: string;
           name: string;
           role: UserRole;
+          tour_completed: boolean;
           created_at: string;
         };
         Insert: {
@@ -62,6 +63,7 @@ export interface Database {
           team_id: string;
           name: string;
           role?: UserRole;
+          tour_completed?: boolean;
           created_at?: string;
         };
         Update: {
@@ -69,6 +71,7 @@ export interface Database {
           team_id?: string;
           name?: string;
           role?: UserRole;
+          tour_completed?: boolean;
           created_at?: string;
         };
         Relationships: [

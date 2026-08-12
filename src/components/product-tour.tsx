@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-
-const STORAGE_KEY = "cat-the-startup:tour";
-const DONE = "done";
+import { markTourCompleted } from "@/app/(app)/tour-actions";
 
 type TourPage = "dashboard" | "startup" | "any";
 
@@ -92,30 +90,6 @@ function findVisibleTarget(id: string): HTMLElement | null {
   return null;
 }
 
-// Plain localStorage-backed external store, same shape as the other
-// one-time hints in this app (see mascot-companion.tsx's PurrAI hint) -
-// "" means never started, a digit string is the current step index, "done"
-// means finished or skipped.
-const listeners = new Set<() => void>();
-let cached: string | null = null;
-
-function read(): string {
-  if (typeof window === "undefined") return "";
-  if (cached === null) cached = localStorage.getItem(STORAGE_KEY) ?? "";
-  return cached;
-}
-
-function write(value: string) {
-  cached = value;
-  localStorage.setItem(STORAGE_KEY, value);
-  listeners.forEach((listener) => listener());
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
 // Mounted once in (app)/layout.tsx, so it's present (and keeps its state)
 // across every page in the app without remounting on navigation - it just
 // re-evaluates against the new pathname each time. When the current step
@@ -123,31 +97,35 @@ function subscribe(listener: () => void) {
 // a small waiting pill rather than auto-navigating anywhere - there's no
 // single "right" startup to jump to, and waiting for a real click keeps
 // the tour from fighting the analyst's own navigation.
-export function ProductTour() {
+//
+// Whether it's been seen lives on the analyst's account (see Step 17 in
+// schema.sql and tour-actions.ts), not localStorage - a per-browser flag
+// reappeared every time an analyst opened a new browser, an incognito
+// window, or a different device, which read as "the tour starts randomly"
+// even though localStorage was behaving exactly as designed. The server
+// component that renders this (see (app)/layout.tsx) already knows the
+// account's tour_completed value at page-load time, so it's passed in
+// directly rather than fetched client-side - no loading state, no flash.
+export function ProductTour({ initialCompleted }: { initialCompleted: boolean }) {
   const pathname = usePathname();
-  const state = useSyncExternalStore(subscribe, read, () => "");
+  const [completed, setCompleted] = useState(initialCompleted);
+  const [stepIndex, setStepIndex] = useState(-1);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [stuck, setStuck] = useState(false);
   const frameRef = useRef<number | null>(null);
 
-  // Reads localStorage directly here rather than trusting `state` - during
-  // hydration useSyncExternalStore briefly renders with the server snapshot
-  // ("") before resyncing to the real client value, and (especially under
-  // React Strict Mode's double-effect-invocation in dev) this effect could
-  // otherwise fire on that transitional render and stomp a real in-progress
-  // step with "0". Reading the actual stored value directly sidesteps that
-  // race entirely - safe to call more than once, since it's a no-op
-  // whenever anything has already been written.
+  // Same-tick timeout rather than a direct setState call in the effect
+  // body, same reasoning as the reset effect further down - this only
+  // starts the tour once, the first time the account's own analyst lands
+  // on the dashboard with tour_completed still false.
   useEffect(() => {
+    if (completed || stepIndex !== -1) return;
     if (pathname !== "/dashboard") return;
-    if (typeof window === "undefined") return;
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return;
-    write("0");
-  }, [pathname]);
+    const startTimeout = setTimeout(() => setStepIndex(0), 0);
+    return () => clearTimeout(startTimeout);
+  }, [completed, stepIndex, pathname]);
 
-  const stepIndex = state === "" || state === DONE ? -1 : Number(state);
-  const step = stepIndex >= 0 && stepIndex < STEPS.length ? STEPS[stepIndex] : null;
+  const step = !completed && stepIndex >= 0 && stepIndex < STEPS.length ? STEPS[stepIndex] : null;
   const onTarget = step ? pageMatches(step.page, pathname) : false;
 
   useEffect(() => {
@@ -191,14 +169,20 @@ export function ProductTour() {
   if (!step) return null;
 
   function finish() {
-    write(DONE);
+    setCompleted(true);
+    // Fire-and-forget, same reasoning as the audit-trail insert in
+    // updateStartupStatus - this is a best-effort persistence write, not
+    // something the UI needs to wait on. Worst case it fails silently and
+    // the tour shows once more next session, which is a fully recoverable
+    // outcome, not a broken one.
+    void markTourCompleted();
   }
 
   function next() {
     if (stepIndex >= STEPS.length - 1) {
       finish();
     } else {
-      write(String(stepIndex + 1));
+      setStepIndex((i) => i + 1);
     }
   }
 

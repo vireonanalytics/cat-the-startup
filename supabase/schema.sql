@@ -701,3 +701,22 @@ create policy "team members can log status changes for their team"
       where s.id = status_changes.startup_id and s.team_id = public.current_team_id()
     )
   );
+
+-- ---------------------------------------------------------------------------
+-- Step 17: track the one-time product tour per account, not per browser
+-- ---------------------------------------------------------------------------
+
+-- Previously tracked in localStorage, which is scoped to a single browser
+-- profile - it reappeared every time an analyst opened a new browser,
+-- incognito window, or device, which reads as "random" even though it was
+-- working exactly as localStorage always does. This follows the account
+-- instead, matching "show it once, ever, per analyst."
+alter table public.users
+  add column if not exists tour_completed boolean not null default false;
+
+drop policy if exists "users can update their own tour_completed flag" on public.users;
+create policy "users can update their own tour_completed flag"
+  on public.users for update
+  to authenticated
+  using (auth.uid() = id)
+  with check (auth.uid() = id);
