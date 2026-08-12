@@ -26,7 +26,12 @@ const nextConfig: NextConfig = {
   // this to e.g. "/startups/[id]" silently no-ops whenever that route's
   // bundle gets merged into some other route's, which it does here.
   outputFileTracingIncludes: {
-    "/*": ["node_modules/@napi-rs/**/*"],
+    "/*": [
+      "node_modules/@napi-rs/**/*",
+      "node_modules/pdfjs-dist/**/*",
+      "node_modules/pdf-to-img/**/*",
+      "node_modules/pdf-parse/**/*",
+    ],
   },
   experimental: {
     serverActions: {
