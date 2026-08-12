@@ -15,6 +15,19 @@ const nextConfig: NextConfig = {
     "pdf-parse",
     "@napi-rs/canvas",
   ],
+  // serverExternalPackages alone isn't enough for @napi-rs/canvas - pdfjs-dist
+  // reaches it via a runtime-constructed require() (createRequire(...)("@napi-rs/canvas")
+  // inside node_utils.js), which the file tracer can't follow statically, so
+  // it silently drops the package's prebuilt platform binary from the deployed
+  // function even though it installs fine at build time. A wildcard key
+  // rather than the specific routes that touch deck PDFs, because Next.js
+  // deduplicates identical function bundles across routes (confirmed via
+  // `vercel build` + inspecting .vercel/output/functions directly) - keying
+  // this to e.g. "/startups/[id]" silently no-ops whenever that route's
+  // bundle gets merged into some other route's, which it does here.
+  outputFileTracingIncludes: {
+    "/*": ["node_modules/@napi-rs/**/*"],
+  },
   experimental: {
     serverActions: {
       // Transcript uploads (.txt/.docx) go straight through the addTranscript
