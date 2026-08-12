@@ -4,7 +4,17 @@ const nextConfig: NextConfig = {
   // pdfjs-dist (used by pdf-to-img and pdf-parse for PDF rendering/parsing)
   // dynamically imports its worker script by path. Bundling it breaks that
   // import, so it's excluded from bundling and loaded via native `require`.
-  serverExternalPackages: ["pdfjs-dist", "pdf-to-img", "pdf-parse"],
+  // @napi-rs/canvas is pdfjs-dist's native rendering backend (it provides
+  // DOMMatrix/ImageData/Path2D, which don't otherwise exist in a Node
+  // serverless runtime) - it ships prebuilt per-platform binaries, so it
+  // needs the same external-package treatment or Vercel's Linux build
+  // (correctly) can't find a bundled binary that runs on it.
+  serverExternalPackages: [
+    "pdfjs-dist",
+    "pdf-to-img",
+    "pdf-parse",
+    "@napi-rs/canvas",
+  ],
   experimental: {
     serverActions: {
       // Transcript uploads (.txt/.docx) go straight through the addTranscript
