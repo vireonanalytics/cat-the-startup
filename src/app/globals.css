@@ -1,8 +1,14 @@
 @import "tailwindcss";
 
+/* This app is dark-only by design - `dark:` is switched from the default
+   media-query strategy to class-based, and `dark` is applied permanently on
+   <html> in layout.tsx, so every existing `dark:` utility across the app
+   applies regardless of the visitor's OS/browser theme setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -12,15 +18,206 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* A faint, sparse paw-print tile - carries the "cat" identity at rest
+   (before any mascot activity ever triggers) without reading as a cartoon
+   graphic. Kept to a near-invisible alpha so it's a background texture, not
+   a decoration competing with real content. See (app)/layout.tsx. */
+.paw-pattern-bg {
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjYwIiBoZWlnaHQ9IjI2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8ZGVmcz4KICAgIDxnIGlkPSJwIj4KICAgICAgPGVsbGlwc2UgY3g9IjAiIGN5PSIxMyIgcng9IjkiIHJ5PSI3Ii8+CiAgICAgIDxlbGxpcHNlIGN4PSItMTQiIGN5PSItMiIgcng9IjQiIHJ5PSI1Ii8+CiAgICAgIDxlbGxpcHNlIGN4PSItNiIgY3k9Ii0xMiIgcng9IjQuMyIgcnk9IjUuNSIvPgogICAgICA8ZWxsaXBzZSBjeD0iNiIgY3k9Ii0xMiIgcng9IjQuMyIgcnk9IjUuNSIvPgogICAgICA8ZWxsaXBzZSBjeD0iMTQiIGN5PSItMiIgcng9IjQiIHJ5PSI1Ii8+CiAgICA8L2c+CiAgPC9kZWZzPgogIDxnIGZpbGw9InJnYmEoMjI0LDEzMCw2MCwwLjE2KSIgc3Ryb2tlPSJyZ2JhKDE5MCwxMDAsNDAsMC4yMikiIHN0cm9rZS13aWR0aD0iMSI+CiAgICA8dXNlIGhyZWY9IiNwIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSg1NSw2MCkgcm90YXRlKC0yMCkgc2NhbGUoMC45KSIvPgogICAgPHVzZSBocmVmPSIjcCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTk2LDQyKSByb3RhdGUoMzgpIHNjYWxlKDEuMDUpIi8+CiAgICA8dXNlIGhyZWY9IiNwIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMTgsMTUyKSByb3RhdGUoLTU4KSBzY2FsZSgwLjgyKSIvPgogICAgPHVzZSBocmVmPSIjcCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMjE5LDE5Mykgcm90YXRlKDEyKSBzY2FsZSgxLjApIi8+CiAgICA8dXNlIGhyZWY9IiNwIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgzMywyMDgpIHJvdGF0ZSg2OCkgc2NhbGUoMC45NSkiLz4KICA8L2c+Cjwvc3ZnPgo=");
+  background-repeat: repeat;
+  background-size: 260px 260px;
+  background-attachment: fixed;
+}
+
+/* Mascot companion animations - one persistent, always-visible cat that
+   acts out whatever the app is currently doing (see mascot-companion.tsx).
+   Each pose gets its own small looping motion so it reads as "alive" even
+   though the underlying art is a static illustration. */
+.mascot-pose {
+  transform-origin: bottom center;
+}
+
+@keyframes mascot-idle {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(-1deg);
+  }
+}
+
+@keyframes mascot-reviewing {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(2deg);
+  }
+}
+
+@keyframes mascot-reading {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes mascot-researching {
+  0%,
+  100% {
+    transform: rotate(-5deg) scale(1);
+  }
+  50% {
+    transform: rotate(5deg) scale(1.04);
+  }
+}
+
+@keyframes mascot-writing {
+  0%,
+  100% {
+    transform: translateX(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateX(3px) rotate(2deg);
+  }
+}
+
+@keyframes mascot-apologetic {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  20% {
+    transform: translateX(-4px) rotate(-3deg);
+  }
+  40% {
+    transform: translateX(4px) rotate(3deg);
+  }
+  60% {
+    transform: translateX(-3px) rotate(-2deg);
+  }
+  80% {
+    transform: translateX(3px) rotate(2deg);
+  }
+}
+
+@keyframes mascot-swiping {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  25% {
+    transform: translateX(-16px) rotate(-10deg);
+  }
+  55% {
+    transform: translateX(18px) rotate(12deg);
+  }
+  80% {
+    transform: translateX(-8px) rotate(-5deg);
+  }
+}
+
+@keyframes mascot-carrying {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(4deg);
+  }
+}
+
+@keyframes mascot-napping {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes mascot-shy {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+  30% {
+    transform: scale(0.96) rotate(-3deg);
+  }
+  60% {
+    transform: scale(0.97) rotate(3deg);
+  }
+}
+
+.mascot-pose-idle {
+  animation: mascot-idle 3.2s ease-in-out infinite;
+}
+.mascot-pose-reviewing {
+  animation: mascot-reviewing 1.8s ease-in-out infinite;
+}
+.mascot-pose-reading {
+  animation: mascot-reading 2.2s ease-in-out infinite;
+}
+.mascot-pose-researching {
+  animation: mascot-researching 1.6s ease-in-out infinite;
+}
+.mascot-pose-writing {
+  animation: mascot-writing 0.5s ease-in-out infinite;
+}
+.mascot-pose-apologetic {
+  animation: mascot-apologetic 1.2s ease-in-out infinite;
+}
+.mascot-pose-swiping {
+  animation: mascot-swiping 0.9s ease-in-out infinite;
+}
+.mascot-pose-carrying {
+  animation: mascot-carrying 0.8s ease-in-out infinite;
+}
+.mascot-pose-napping {
+  animation: mascot-napping 3.5s ease-in-out infinite;
+}
+.mascot-pose-graveyard {
+  animation: mascot-napping 3.5s ease-in-out infinite;
+}
+.mascot-pose-shy {
+  animation: mascot-shy 0.6s ease-in-out 2;
+}
+
+/* Rotating flavor text under the idle companion cat (mascot-companion.tsx)
+   - purely decorative, so it fades in gently rather than popping in like
+   the functional activity bubble it replaces when there's nothing real to
+   report. */
+@keyframes quip-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.quip-fade {
+  animation: quip-fade-in 0.5s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-pose {
+    animation: none !important;
+  }
+  .quip-fade {
+    animation: none !important;
+  }
 }
