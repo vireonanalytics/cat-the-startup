@@ -876,7 +876,14 @@ export async function processNewDeckAndExtractStartupInfo(
   try {
     response = await client.messages.create({
       model: REVIEW_MODEL,
-      max_tokens: 1024,
+      // 1024 was too tight once a deck runs to dozens of image pages -
+      // "high" effort spends tokens on reasoning over all of them before it
+      // ever writes the (tiny) JSON answer, so large decks hit the cap with
+      // no text block yet emitted and silently extracted nothing. Matched
+      // to a fraction of runReviewGeneration's 8192 budget for the same
+      // image set, since this schema's actual output is a handful of short
+      // strings, not the review's long-form content.
+      max_tokens: 4096,
       output_config: {
         effort: "high",
         format: { type: "json_schema", schema: STARTUP_INFO_SCHEMA },
@@ -960,6 +967,20 @@ export async function processNewDeckAndExtractStartupInfo(
         `/startups/${startupId}?error=${encodeURIComponent("The deck was attached, but automatic info extraction failed to parse - fill in the fields by hand using Edit.")}`
       );
     }
+  } else {
+    // No text block at all (e.g. stop_reason "max_tokens" cut the response
+    // off before the model wrote its answer) used to fall through here
+    // silently, leaving the placeholder name in place with no indication
+    // anything had gone wrong - surfaced the same way the other failure
+    // modes above already are.
+    console.error(
+      "Startup info extraction produced no text block:",
+      response.stop_reason
+    );
+    revalidatePath(`/startups/${startupId}`);
+    redirect(
+      `/startups/${startupId}?error=${encodeURIComponent("The deck was attached, but automatic info extraction didn't return anything usable - fill in the fields by hand using Edit.")}`
+    );
   }
 
   revalidatePath(`/startups/${startupId}`);
