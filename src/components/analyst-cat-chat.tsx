@@ -69,7 +69,7 @@ export function AnalystCatChat({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setAnalystChatHandler(() => () => setIsOpen(true));
+    setAnalystChatHandler(() => () => setIsOpen((v) => !v));
     return () => setAnalystChatHandler(null);
   }, [setAnalystChatHandler]);
 

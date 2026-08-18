@@ -3,18 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { StartupStatus } from "@/lib/supabase/types";
-import { Mascot } from "@/components/mascot";
 import { STATUS_OPTIONS } from "@/components/status-form";
 import { SECTORS } from "@/lib/constants";
-
-// A "new" startup untouched for this long gets a napping badge - an ambient
-// nudge that it's been neglected, without a harsh "overdue" warning color.
-const STALE_NEW_DAYS = 5;
-
-function daysSince(value: string): number {
-  const ms = Date.now() - new Date(value).getTime();
-  return Math.floor(ms / (1000 * 60 * 60 * 24));
-}
 
 export interface StartupRow {
   id: string;
@@ -243,10 +233,6 @@ export function StartupsTable({ startups }: { startups: StartupRow[] }) {
             </thead>
             <tbody>
               {sorted.map((startup) => {
-                const staleDays = daysSince(startup.created_at);
-                const isStaleNew =
-                  startup.status === "new" && staleDays >= STALE_NEW_DAYS;
-
                 return (
                 <tr
                   key={startup.id}
@@ -254,11 +240,6 @@ export function StartupsTable({ startups }: { startups: StartupRow[] }) {
                 >
                   <td className="px-4 py-3">
                     <span className="flex items-center gap-1.5">
-                      {isStaleNew && (
-                        <span title={`Napping — ${staleDays} days untouched in "New"`}>
-                          <Mascot pose="napping" size={22} />
-                        </span>
-                      )}
                       <Link
                         href={`/startups/${startup.id}`}
                         className="font-medium text-zinc-950 hover:underline dark:text-zinc-50"

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { decryptSecret } from "@/lib/crypto";
+import { sendAccountCreatedEmail } from "@/lib/email";
 import type { Database } from "@/lib/supabase/types";
 
 async function requireAdmin() {
@@ -92,6 +93,12 @@ export async function approveSignupRequest(formData: FormData) {
       decided_by: adminId,
     })
     .eq("id", requestId);
+
+  // Best-effort, same reasoning as sendSignupRequestEmail in requestAccess -
+  // the account already exists and can already sign in by this point, so a
+  // missing key or a Resend outage here shouldn't undo the approval or
+  // block the admin's flow.
+  await sendAccountCreatedEmail({ name: request.name, email: request.email });
 
   revalidatePath("/admin/requests");
   redirect("/admin/requests?approved=1");
