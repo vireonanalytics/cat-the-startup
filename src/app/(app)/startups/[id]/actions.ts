@@ -878,9 +878,14 @@ export async function processNewDeckAndExtractStartupInfo(
   // them concurrently means an analyst waits max(extraction, review)
   // instead of their sum - previously this call was missing here entirely,
   // so a startup created from a deck sat with no review until someone
-  // noticed and clicked Regenerate by hand. allSettled rather than
-  // Promise.all because a failure on either side should still let the other
-  // one's result stand, not take the whole request down with it.
+  // noticed and clicked Regenerate by hand. Calls runReviewGeneration
+  // directly rather than through maybeAutoRegenerateReview - that helper
+  // deliberately skips the *first* review (see shouldAutoRegenerateReview),
+  // which is exactly backwards here: this path's whole point is generating
+  // that first review, not keeping an existing one in sync. allSettled
+  // rather than Promise.all because a failure on either side should still
+  // let the other one's result stand, not take the whole request down
+  // with it.
   const [extractionSettled, reviewSettled] = await Promise.allSettled([
     client.messages.create({
       // This is a mechanical "copy down what's literally printed on the
@@ -911,13 +916,18 @@ export async function processNewDeckAndExtractStartupInfo(
         },
       ],
     }),
-    maybeAutoRegenerateReview(supabase, startupId),
+    runReviewGeneration(supabase, startupId),
   ]);
 
   if (reviewSettled.status === "rejected") {
     console.error(
       "Auto review generation failed during deck-based startup creation:",
       reviewSettled.reason
+    );
+  } else if ("error" in reviewSettled.value) {
+    console.error(
+      "Auto review generation failed during deck-based startup creation:",
+      reviewSettled.value.error
     );
   }
 
