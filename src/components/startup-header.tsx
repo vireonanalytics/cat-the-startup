@@ -349,7 +349,9 @@ export function StartupHeader({
               >
                 Edit
               </button>
-              <MoveToGraveyardButton startupId={startup.id} />
+              {startup.status !== "passed" && (
+                <MoveToGraveyardButton startupId={startup.id} />
+              )}
             </span>
           </div>
 

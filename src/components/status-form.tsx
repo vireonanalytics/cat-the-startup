@@ -18,15 +18,27 @@ export function StatusForm({
   status: StartupStatus;
 }) {
   // "Passed" is deliberately not a choice here - the only way in is the
-  // dedicated graveyard button on this page (see MoveToGraveyardButton),
-  // which also logs the audit-trail entry and shows the "still in the
-  // graveyard" note, neither of which a bare dropdown change would do.
-  // Still included when the startup is *already* passed, purely so its
-  // dropdown shows that real current value instead of silently falling
-  // back to whichever option happens to be listed first.
-  const options = STATUS_OPTIONS.filter(
-    (option) => option.value !== "passed" || status === "passed"
-  );
+  // dedicated graveyard button on this page (see MoveToGraveyardButton).
+  // Once a startup *is* passed, the dropdown is replaced entirely (below)
+  // rather than just excluding "passed" from its options - leaving the
+  // other three selectable let an analyst switch straight back out via this
+  // same control, which defeats the graveyard being the one deliberate
+  // path both in and out (restoring lives on /passed - see
+  // RestoreStartupButton).
+  if (status === "passed") {
+    return (
+      <span className="flex items-center gap-2 text-sm">
+        <span className="font-medium text-zinc-700 dark:text-zinc-300">
+          Status
+        </span>
+        <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+          Passed
+        </span>
+      </span>
+    );
+  }
+
+  const options = STATUS_OPTIONS.filter((option) => option.value !== "passed");
 
   return (
     <form action={updateStartupStatus} className="flex items-center gap-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { generateReview } from "@/app/(app)/startups/[id]/actions";
 import { useReviewRegeneration } from "@/components/review-regeneration-context";
@@ -18,11 +18,24 @@ function GenerateButton({
   // that split used to mean a manual click never got the "still working on
   // it" apology no matter how long it ran, since nothing here tracked wait
   // time at all.
-  const { notifyRegenerationStarted } = useReviewRegeneration();
+  const { notifyRegenerationStarted, notifyRegenerationFinished } =
+    useReviewRegeneration();
+  // Only clear the activity on a pending true -> false transition that this
+  // button itself caused - `pending` starts (and often sits) at false, and
+  // unconditionally calling notifyRegenerationFinished on every false would
+  // also cut off a background regeneration this button had nothing to do
+  // with (see maybeTriggerBackgroundRegeneration).
+  const startedRef = useRef(false);
 
   useEffect(() => {
-    if (pending) notifyRegenerationStarted();
-  }, [pending, notifyRegenerationStarted]);
+    if (pending) {
+      startedRef.current = true;
+      notifyRegenerationStarted();
+    } else if (startedRef.current) {
+      startedRef.current = false;
+      notifyRegenerationFinished();
+    }
+  }, [pending, notifyRegenerationStarted, notifyRegenerationFinished]);
 
   return (
     <button

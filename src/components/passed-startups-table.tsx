@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { updateStartupStatus } from "@/app/(app)/startups/[id]/actions";
 import { useMascot } from "@/components/mascot-context";
 
 const RECALL_DURATION_MS = 5000;
@@ -103,6 +104,9 @@ export function PassedStartupsTable({
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                 Created
               </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -135,6 +139,26 @@ export function PassedStartupsTable({
                 </td>
                 <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                   {formatDate(startup.created_at)}
+                </td>
+                <td className="px-4 py-3">
+                  {/* The only path back out of the graveyard (see
+                      StatusForm, which no longer offers other statuses once
+                      a startup is passed) - restoring is a deliberate act
+                      that belongs here, not a stray dropdown click on the
+                      startup's own page. */}
+                  <form
+                    action={updateStartupStatus}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <input type="hidden" name="id" value={startup.id} />
+                    <input type="hidden" name="status" value="new" />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-zinc-300 px-2.5 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                    >
+                      Restore
+                    </button>
+                  </form>
                 </td>
               </tr>
             ))}

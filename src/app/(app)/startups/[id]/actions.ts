@@ -872,20 +872,33 @@ export async function processNewDeckAndExtractStartupInfo(
 
   const client = createAnthropicClient();
 
-  let response;
-  try {
-    response = await client.messages.create({
-      model: REVIEW_MODEL,
+  // Kicked off alongside extraction (not after it) for two reasons: the
+  // review reads the deck's page images fresh from storage itself, so it
+  // has no real dependency on the extracted name/sector/etc:, and running
+  // them concurrently means an analyst waits max(extraction, review)
+  // instead of their sum - previously this call was missing here entirely,
+  // so a startup created from a deck sat with no review until someone
+  // noticed and clicked Regenerate by hand. allSettled rather than
+  // Promise.all because a failure on either side should still let the other
+  // one's result stand, not take the whole request down with it.
+  const [extractionSettled, reviewSettled] = await Promise.allSettled([
+    client.messages.create({
+      // This is a mechanical "copy down what's literally printed on the
+      // slide" task, not an analytical one - Opus's extra reasoning depth
+      // (used for the actual review, where it matters) doesn't buy anything
+      // here, only latency. Sonnet is fast enough to make this feel closer
+      // to instant instead of tying up the same 30-90s an analyst expects
+      // for a full review.
+      model: CHAT_MODEL,
       // 1024 was too tight once a deck runs to dozens of image pages -
-      // "high" effort spends tokens on reasoning over all of them before it
-      // ever writes the (tiny) JSON answer, so large decks hit the cap with
-      // no text block yet emitted and silently extracted nothing. Matched
-      // to a fraction of runReviewGeneration's 8192 budget for the same
-      // image set, since this schema's actual output is a handful of short
-      // strings, not the review's long-form content.
+      // effort spent tokens on reasoning over all of them before it ever
+      // wrote the (tiny) JSON answer, so large decks hit the cap with no
+      // text block yet emitted and silently extracted nothing. Left with
+      // headroom even at "low" effort now that the model switch above also
+      // cuts down how much of that budget reasoning eats into.
       max_tokens: 4096,
       output_config: {
-        effort: "high",
+        effort: "low",
         format: { type: "json_schema", schema: STARTUP_INFO_SCHEMA },
       },
       messages: [
@@ -897,9 +910,19 @@ export async function processNewDeckAndExtractStartupInfo(
           ],
         },
       ],
-    });
-  } catch (err) {
-    console.error("Startup info extraction failed:", err);
+    }),
+    maybeAutoRegenerateReview(supabase, startupId),
+  ]);
+
+  if (reviewSettled.status === "rejected") {
+    console.error(
+      "Auto review generation failed during deck-based startup creation:",
+      reviewSettled.reason
+    );
+  }
+
+  if (extractionSettled.status === "rejected") {
+    console.error("Startup info extraction failed:", extractionSettled.reason);
     // Extraction failing shouldn't block the startup from being created
     // with its deck attached - the analyst can fill the rest in by hand
     // via Edit. Surfaced as an error banner rather than failing silently,
@@ -909,6 +932,8 @@ export async function processNewDeckAndExtractStartupInfo(
       `/startups/${startupId}?error=${encodeURIComponent("The deck was attached, but automatic info extraction failed - fill in the fields by hand using Edit.")}`
     );
   }
+
+  const response = extractionSettled.value;
 
   if (response.stop_reason === "refusal") {
     revalidatePath(`/startups/${startupId}`);

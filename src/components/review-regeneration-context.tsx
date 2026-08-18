@@ -16,6 +16,7 @@ import { useMascot } from "@/components/mascot-context";
 interface ReviewRegenerationContextValue {
   isRegenerating: boolean;
   notifyRegenerationStarted: () => void;
+  notifyRegenerationFinished: () => void;
 }
 
 const ReviewRegenerationContext =
@@ -89,9 +90,21 @@ export function ReviewRegenerationProvider({
     setIsRegenerating(true);
   }, []);
 
+  // Lets the manual "Regenerate" button (see generate-review-form.tsx) clear
+  // the activity the instant its own form submission resolves, instead of
+  // waiting on the polling loop above to notice - that loop only fires every
+  // POLL_INTERVAL_MS, so relying on it alone left the cat's animation
+  // several seconds out of sync with what had actually finished, in either
+  // direction. Background-triggered regenerations (adding evidence,
+  // refreshing research - see maybeTriggerBackgroundRegeneration) have no
+  // "pending" of their own to hook into, so they still rely on the poll.
+  const notifyRegenerationFinished = useCallback(() => {
+    setIsRegenerating(false);
+  }, []);
+
   return (
     <ReviewRegenerationContext.Provider
-      value={{ isRegenerating, notifyRegenerationStarted }}
+      value={{ isRegenerating, notifyRegenerationStarted, notifyRegenerationFinished }}
     >
       {children}
     </ReviewRegenerationContext.Provider>
