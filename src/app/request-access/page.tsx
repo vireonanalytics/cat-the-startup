@@ -21,8 +21,8 @@ export default async function RequestAccessPage({
           <>
             <Mascot pose="shy" size={72} className="mx-auto mb-3" priority />
             <p className="mb-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-              Sent! We&apos;ll email you once your request has been reviewed
-              — no account exists yet until then.
+              Sent! Waiting for your request to be approved — no account
+              exists yet until then.
             </p>
             <Link
               href="/login"
