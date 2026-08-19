@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cat the Startup 🐾
 
-## Getting Started
+An AI-assisted deal-triage tool for VC analysts. Upload a pitch deck (or log a startup by hand), and it extracts the basics, runs public research on the founders and company, and generates a structured investment review - verdict, thesis, why-invest, why-not, contradictions, and open unknowns - that a team can discuss, revise, and export to a memo.
 
-First, run the development server:
+Live at [cat-the-startup.vercel.app](https://cat-the-startup.vercel.app).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Features
+
+- **Deck-based intake** - upload a PDF pitch deck and the name, domain, sector, stage, ask amount, and founders are extracted automatically; anything the deck doesn't cover is left blank to fill in by hand.
+- **AI review** - a Claude-generated verdict with supporting evidence, versioned so you can see how the read on a company changed over time and diff between versions.
+- **Online research** - public web research on the founders and company at three depths (Fast / Medium / Extended), feeding facts and citations straight into the review.
+- **Evidence & discussion** - attach call transcripts and notes that feed the AI review, plus a separate private team chat ("Cat-ch Up") that never does.
+- **PurrAI** - an in-page Q&A assistant grounded only in what's already on that startup's page (deck, evidence, research, review).
+- **Memo export** - turn the current review into a formatted `.docx` investment-committee memo.
+- **Team accounts** - invite-only signup with admin approval, per-team row-level security in Supabase, and an audit trail on status changes.
+- **The graveyard** - passed startups move to a browsable archive instead of disappearing.
+- **Self-driving product tour** - a first-run walkthrough that navigates itself through the dashboard, deck upload, and every tab of a real startup.
+
+## Tech stack
+
+- [Next.js 16](https://nextjs.org) (App Router, Server Actions) + React 19 + TypeScript
+- [Supabase](https://supabase.com) — Postgres, Auth, Storage, and row-level security
+- [Anthropic Claude](https://www.anthropic.com) via `@anthropic-ai/sdk` — deck extraction, review generation, online research, PurrAI chat
+- Tailwind CSS 4
+- Deployed on [Vercel](https://vercel.com)
+
+## Project structure
+
+```
+src/app/(app)/          Authenticated app shell (dashboard, startup detail, passed, admin)
+src/app/login/           Sign-in
+src/app/request-access/  Invite-only signup + admin approval flow
+src/components/          UI components (review, research, evidence, chat, mascot, product tour)
+src/lib/                 Supabase clients, Claude prompts/schemas, shared types and constants
+supabase/schema.sql      Full database schema (tables, RLS policies, triggers)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Ownership
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+A Vireon Analytics LLC product. Private repository - not open for external contributions.
