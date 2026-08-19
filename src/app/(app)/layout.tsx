@@ -31,12 +31,20 @@ export default async function AppLayout({
   // this one (a real deck with a full review/research/evidence trail, so
   // every step actually has something to point at). Only queried when the
   // tour might still run - an analyst who's already finished it never pays
-  // for this lookup.
+  // for this lookup. Exact name match, not a prefix - "LinkedIn Series B
+  // Pitch Deck 2004" is a leftover duplicate from an earlier bad upload
+  // that got passed on, and a bare ilike prefix match with no ORDER BY has
+  // no guaranteed row order, so it was liable to land on that dead one
+  // instead of the real "LinkedIn" startup still active on the dashboard.
+  // Excluding "passed" is an extra guard against ever pointing the tour at
+  // a graveyarded startup, even if more duplicates show up later.
   const { data: tourStartup } = profile && !profile.tour_completed
     ? await supabase
         .from("startups")
         .select("id")
-        .ilike("name", "linkedin%")
+        .eq("name", "LinkedIn")
+        .neq("status", "passed")
+        .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle()
     : { data: null };
