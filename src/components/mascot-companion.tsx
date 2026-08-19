@@ -45,7 +45,15 @@ const ASK_CAPTION = "Pet me if you want answers about this startup!";
 // this swapped in a rotating "cute cats meanwhile" photo widget instead of
 // text - dropped in favor of just letting the cat look sheepish and say so,
 // simpler and more in character than a distraction.
-const LONG_WAIT_MS = 30_000;
+//
+// 60s, not 30s: review generation alone routinely runs 30-90s (Opus, high
+// effort, up to 26 deck images), so a 30s threshold swapped the "writing"
+// cat out for the apology pose on almost every single regeneration, mid-
+// flight, while the model call was still genuinely in progress - reading
+// as "it gave up" rather than the rare, reassuring exception it's meant to
+// be. 60s still catches genuinely stuck/unusual waits without firing on
+// the normal case.
+const LONG_WAIT_MS = 60_000;
 const APOLOGY_MESSAGE = "Sorry, this is taking longer than usual — still on it!";
 const NO_ACTIVITY_ID = -1;
 
