@@ -132,7 +132,19 @@ export function DiscussionChat({
   const [error, setError] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const { pushActivity } = useMascot();
+  const { pushActivity, setIsDiscussionChatOpen } = useMascot();
+
+  // Lets AnalystCatChat's mobile panel (see analyst-cat-chat.tsx) know to
+  // reposition itself above this one instead of sitting on top of it, on
+  // viewports below lg where both fall back to independent fixed corners
+  // rather than the shared stacking rail column (see (app)/layout.tsx).
+  useEffect(() => {
+    setIsDiscussionChatOpen(isOpen);
+  }, [isOpen, setIsDiscussionChatOpen]);
+
+  useEffect(() => {
+    return () => setIsDiscussionChatOpen(false);
+  }, [setIsDiscussionChatOpen]);
 
   // Server snapshot reports "everything seen" (0 unread) - localStorage
   // isn't readable during SSR - so the server-rendered and first-client

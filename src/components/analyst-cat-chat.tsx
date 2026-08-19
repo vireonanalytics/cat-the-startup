@@ -57,7 +57,8 @@ export function AnalystCatChat({
   startupId: string;
   startupName: string;
 }) {
-  const { setAnalystChatHandler, setIsAnalystChatOpen } = useMascot();
+  const { setAnalystChatHandler, setIsAnalystChatOpen, isDiscussionChatOpen } =
+    useMascot();
   const anchor = usePortalTarget("analyst-chat-anchor");
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatTurn[]>([]);
@@ -240,8 +241,21 @@ export function AnalystCatChat({
           entirely, so this fixed, independently-positioned panel is the
           only way to reach the chat - opened from MascotMobileButton (see
           mascot-companion.tsx), which lives in the same bottom-left corner
-          this expands from. */}
-      <div className="fixed bottom-24 left-5 z-40 flex max-h-[60vh] w-[calc(100vw-2.5rem)] max-w-sm flex-col overflow-hidden rounded-xl border border-black/10 bg-white shadow-2xl lg:hidden dark:border-white/10 dark:bg-zinc-950">
+          this expands from. Cat-ch Up (discussion-chat.tsx) falls back to
+          its own independent bottom-right corner down here too, instead of
+          sharing the lg+ rail's single stacking column - so if an analyst
+          has both open on a phone, this shifts up above Cat-ch Up's panel
+          (bottom-5, up to 420px tall - see discussion-chat.tsx) rather than
+          sitting on top of it, and shrinks its own max-height to leave that
+          taller position room to actually fit on a short viewport. */}
+      <div
+        className={
+          "fixed left-5 z-40 flex w-[calc(100vw-2.5rem)] max-w-sm flex-col overflow-hidden rounded-xl border border-black/10 bg-white shadow-2xl lg:hidden dark:border-white/10 dark:bg-zinc-950 " +
+          (isDiscussionChatOpen
+            ? "bottom-[29rem] max-h-[40vh]"
+            : "bottom-24 max-h-[60vh]")
+        }
+      >
         {panelBody}
       </div>
     </>

@@ -55,6 +55,17 @@ interface MascotContextValue {
    */
   isAnalystChatOpen: boolean;
   setIsAnalystChatOpen: (open: boolean) => void;
+  /**
+   * Same pattern as isAnalystChatOpen, set by DiscussionChat (see
+   * discussion-chat.tsx) instead. Below lg, both chats fall back to their
+   * own independent `fixed` corners rather than the shared rail column
+   * that keeps them apart at lg+ (see the aside in (app)/layout.tsx) - so
+   * AnalystCatChat's mobile panel reads this to shift itself above Cat-ch
+   * Up's panel instead of sitting on top of it when an analyst has both
+   * open on a phone-width screen.
+   */
+  isDiscussionChatOpen: boolean;
+  setIsDiscussionChatOpen: (open: boolean) => void;
 }
 
 const MascotContext = createContext<MascotContextValue | null>(null);
@@ -68,6 +79,7 @@ export function MascotProvider({ children }: { children: ReactNode }) {
     (() => void) | null
   >(null);
   const [isAnalystChatOpen, setIsAnalystChatOpen] = useState(false);
+  const [isDiscussionChatOpen, setIsDiscussionChatOpen] = useState(false);
 
   const pushActivity = useCallback((pose: MascotPose, message: string) => {
     const id = nextId++;
@@ -92,6 +104,8 @@ export function MascotProvider({ children }: { children: ReactNode }) {
         setAnalystChatHandler,
         isAnalystChatOpen,
         setIsAnalystChatOpen,
+        isDiscussionChatOpen,
+        setIsDiscussionChatOpen,
       }}
     >
       {children}
