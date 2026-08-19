@@ -29,15 +29,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* A visible ownership mark, not a real IP protection - lives in
             the root layout (not (app)/layout.tsx) so it's on every page,
             including the pre-auth login/request-access screens someone
-            evaluating the product would see first. Desktop-only: below lg,
-            both bottom corners are already claimed by the mascot button and
-            Cat-ch Up's own toggle (see mascot-companion.tsx /
-            discussion-chat.tsx), and a phone screen has no clean spot left
-            for a third fixed corner element without risking the exact kind
-            of overlap those two just got fixed for. */}
-        <div className="pointer-events-none fixed bottom-3 left-3 z-30 hidden select-none text-xs text-zinc-500/70 lg:block dark:text-zinc-500/60">
-          A Vireon Analytics LLC product
-        </div>
+            evaluating the product would see first. A true footer in normal
+            flow (mt-auto against the body's own flex-col, not
+            position:fixed) - it sits at the bottom of short pages and
+            scrolls away below long ones, rather than floating over content
+            the whole time. */}
+        <footer className="mt-auto shrink-0 px-4 py-3 text-center text-xs text-zinc-500/70 dark:text-zinc-500/60">
+          © 2026 Vireon Analytics LLC. All rights reserved.
+        </footer>
       </body>
     </html>
   );
