@@ -1,23 +1,40 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { markTourCompleted } from "@/app/(app)/tour-actions";
+import { useMobileNav } from "@/components/mobile-nav-context";
 
-type TourPage = "dashboard" | "startup" | "any";
+type TourPage = "dashboard" | "new-startup" | "startup" | "any";
 
 interface TourStep {
+  /** data-tour id this step points at and measures every frame. */
   target: string;
   page: TourPage;
   title: string;
   body: string;
+  /** Click the element once it's found, to actually show what this step is
+   * describing (switch a tab, open a chat panel) instead of just pointing
+   * at it. Defaults to clicking `target` itself; set `clickTarget` when the
+   * thing to click isn't the thing to keep highlighted (Cat-ch Up's toggle
+   * button disappears once clicked - see clickTarget below). */
+  autoClick?: boolean;
+  /** data-tour id to click instead of `target` when autoClick fires.
+   * Only needed when they differ. */
+  clickTarget?: string;
+  /** How to undo autoClick when this step ends. "toggle" re-clicks
+   * `clickTarget`/`target` (works for elements that toggle open/closed,
+   * like the PurrAI cat). A string is the data-tour id of a distinct close
+   * control to click instead (Cat-ch Up's panel only has a dedicated ✕). */
+  closeOnExit?: "toggle" | string;
 }
 
 // One continuous walkthrough spanning the dashboard and a startup's detail
 // page, in the order a new analyst would actually encounter these things.
 // Steps tagged "any" target elements that live in the persistent header
-// nav, so they render wherever the tour happens to be; only "dashboard" and
-// "startup" gate on a specific route.
+// nav, so they render wherever the tour happens to be; "dashboard",
+// "new-startup", and "startup" each gate on (and auto-navigate to) a
+// specific route.
 const STEPS: TourStep[] = [
   {
     target: "dashboard-table",
@@ -26,40 +43,48 @@ const STEPS: TourStep[] = [
     body: "Every inbound startup your team is triaging lands here - sort or filter it by sector and status.",
   },
   {
-    target: "add-startup-link",
-    page: "any",
+    target: "deck-upload-form",
+    page: "new-startup",
     title: "Add a startup",
-    body: "Log one by hand, or upload a pitch deck (PDF) and the name, sector, stage, ask, and founders get pulled out for you automatically.",
+    body: "Log one by hand above, or drop a pitch deck here (PDF) and the name, sector, stage, ask, and founders get pulled out for you automatically.",
   },
   {
     target: "review-tab",
     page: "startup",
     title: "AI review",
     body: "A generated verdict plus why-invest, why-not, and open unknowns - regenerate it any time new material comes in.",
+    autoClick: true,
   },
   {
     target: "research-tab",
     page: "startup",
     title: "Online research",
     body: "Kicks off public web research on the founders and company. Fast is a quick gut-check, Medium a solid pass, Extended goes deep - each searches more and returns more facts.",
+    autoClick: true,
   },
   {
     target: "evidence-tab",
     page: "startup",
     title: "Evidence",
     body: "Drop call transcripts and other notes here - they feed straight into the AI review alongside the deck.",
+    autoClick: true,
   },
   {
     target: "purrai-cat",
     page: "startup",
     title: "PurrAI",
     body: "Pet the cat to ask questions about this specific startup - it answers from everything gathered on this page.",
+    autoClick: true,
+    closeOnExit: "toggle",
   },
   {
-    target: "catchup-button",
+    target: "catchup-panel",
     page: "startup",
     title: "Cat-ch Up",
     body: "Your team's private chat for this deal - notes here are never sent to the AI review.",
+    autoClick: true,
+    clickTarget: "catchup-button",
+    closeOnExit: "catchup-close",
   },
   {
     target: "passed-link",
@@ -72,6 +97,7 @@ const STEPS: TourStep[] = [
 function pageMatches(page: TourPage, pathname: string): boolean {
   if (page === "any") return true;
   if (page === "dashboard") return pathname === "/dashboard";
+  if (page === "new-startup") return pathname === "/startups/new";
   return /^\/startups\/(?!new(?:\/|$))/.test(pathname);
 }
 
@@ -90,13 +116,42 @@ function findVisibleTarget(id: string): HTMLElement | null {
   return null;
 }
 
+// Scrolls a target into view only if it isn't already comfortably on
+// screen - called once per step rather than unconditionally, so steps
+// whose target is already visible (the dashboard table, a tab bar) don't
+// get a pointless nudge every time.
+function ensureVisible(el: HTMLElement) {
+  const r = el.getBoundingClientRect();
+  const margin = 100;
+  if (r.top < margin || r.bottom > window.innerHeight - margin) {
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+
+// Undoes a step's autoClick when the analyst moves on - re-clicking a
+// toggle, or clicking a distinct close control, so a step that opened
+// PurrAI or Cat-ch Up to show it off doesn't leave it open once the tour
+// has moved on to something else. Safe to call on any step (including
+// ones with no autoClick, or ones whose target no longer exists) - the
+// optional chaining just no-ops.
+function closeStepIfNeeded(step: TourStep | null) {
+  if (!step || !step.autoClick || !step.closeOnExit) return;
+  if (step.closeOnExit === "toggle") {
+    findVisibleTarget(step.clickTarget ?? step.target)?.click();
+  } else {
+    findVisibleTarget(step.closeOnExit)?.click();
+  }
+}
+
 // Mounted once in (app)/layout.tsx, so it's present (and keeps its state)
 // across every page in the app without remounting on navigation - it just
-// re-evaluates against the new pathname each time. When the current step
-// needs the startup detail page and the analyst isn't on one yet, it shows
-// a small waiting pill rather than auto-navigating anywhere - there's no
-// single "right" startup to jump to, and waiting for a real click keeps
-// the tour from fighting the analyst's own navigation.
+// re-evaluates against the new pathname each time. The tour drives itself
+// end to end: it navigates to whichever page a step needs (see
+// tourStartupId below - a real, already-populated startup picked
+// server-side, not left for the analyst to click into), clicks tabs and
+// panels open to actually show what it's describing instead of just
+// pointing at them, closes what it opened before moving on, and opens the
+// mobile hamburger menu itself for steps whose target only lives there.
 //
 // Whether it's been seen lives on the analyst's account (see Step 17 in
 // schema.sql and tour-actions.ts), not localStorage - a per-browser flag
@@ -106,8 +161,16 @@ function findVisibleTarget(id: string): HTMLElement | null {
 // component that renders this (see (app)/layout.tsx) already knows the
 // account's tour_completed value at page-load time, so it's passed in
 // directly rather than fetched client-side - no loading state, no flash.
-export function ProductTour({ initialCompleted }: { initialCompleted: boolean }) {
+export function ProductTour({
+  initialCompleted,
+  tourStartupId,
+}: {
+  initialCompleted: boolean;
+  tourStartupId: string | null;
+}) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { setIsOpen: setMobileNavOpen } = useMobileNav();
   const [completed, setCompleted] = useState(initialCompleted);
   const [stepIndex, setStepIndex] = useState(-1);
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -127,6 +190,22 @@ export function ProductTour({ initialCompleted }: { initialCompleted: boolean })
 
   const step = !completed && stepIndex >= 0 && stepIndex < STEPS.length ? STEPS[stepIndex] : null;
   const onTarget = step ? pageMatches(step.page, pathname) : false;
+  const canAutoNavigate =
+    !!step && (step.page === "new-startup" || (step.page === "startup" && !!tourStartupId));
+
+  // Drives the navigation itself rather than waiting for the analyst to
+  // click into a startup or find "Add startup" - once onTarget flips true
+  // (the router.push below lands and pathname updates) this condition
+  // goes false and the effect stops re-firing, so there's no repeat-
+  // navigation loop.
+  useEffect(() => {
+    if (!step || onTarget) return;
+    if (step.page === "startup" && tourStartupId) {
+      router.push(`/startups/${tourStartupId}`);
+    } else if (step.page === "new-startup") {
+      router.push("/startups/new");
+    }
+  }, [step, onTarget, tourStartupId, router]);
 
   useEffect(() => {
     if (!step || !onTarget) {
@@ -138,25 +217,57 @@ export function ProductTour({ initialCompleted }: { initialCompleted: boolean })
       return () => clearTimeout(resetTimeout);
     }
 
+    // Start every step with the mobile hamburger menu closed - most step
+    // targets aren't inside it, and a menu left open from the previous step
+    // would otherwise cover the very thing this step wants to highlight.
+    setMobileNavOpen(false);
+
     // A step's target can be on the right page yet still not exist right
     // now - most commonly because the page itself is still loading (a
-    // fresh client-side navigation to a startup page has to wait on a
-    // Server Component data fetch, and in dev mode the very first visit to
-    // a route also pays an on-demand compile that alone can run several
-    // seconds - both are completely normal and have nothing to do with the
-    // target actually being unreachable). The one case that's genuinely
-    // permanent, not just slow, is a target that only exists inside the
-    // closed mobile hamburger menu (see mobile-nav-menu.tsx). Elapsed wall
-    // time rather than a frame count, since rAF cadence isn't reliable
-    // across devices/tabs - 8s comfortably clears normal load latency while
-    // still eventually rescuing the permanent case.
+    // fresh client-side navigation has to wait on a Server Component data
+    // fetch, and in dev mode the very first visit to a route also pays an
+    // on-demand compile that alone can run several seconds - both are
+    // completely normal and have nothing to do with the target actually
+    // being unreachable). The one case that's genuinely permanent, not
+    // just slow, is a target that only exists inside the closed mobile
+    // hamburger menu (see mobile-nav-menu.tsx) - rather than ask the
+    // analyst to open it, this opens it for them once the normal load
+    // window has passed. Elapsed wall time rather than a frame count,
+    // since rAF cadence isn't reliable across devices/tabs.
+    const OPEN_MENU_AFTER_MS = 1200;
     const STUCK_AFTER_MS = 8000;
     const startedAt = Date.now();
+    let menuOpened = false;
+    let autoClicked = false;
+    let scrolled = false;
 
     function measure() {
       const el = findVisibleTarget(step!.target);
-      setRect(el ? el.getBoundingClientRect() : null);
-      setStuck(!el && Date.now() - startedAt > STUCK_AFTER_MS);
+
+      if (el) {
+        if (!scrolled) {
+          scrolled = true;
+          ensureVisible(el);
+        }
+        setRect(el.getBoundingClientRect());
+      } else {
+        setRect(null);
+      }
+
+      if (step!.autoClick && !autoClicked) {
+        const clickEl = findVisibleTarget(step!.clickTarget ?? step!.target);
+        if (clickEl) {
+          autoClicked = true;
+          clickEl.click();
+        }
+      }
+
+      const elapsed = Date.now() - startedAt;
+      if (!el && !menuOpened && elapsed > OPEN_MENU_AFTER_MS) {
+        menuOpened = true;
+        setMobileNavOpen(true);
+      }
+      setStuck(!el && elapsed > STUCK_AFTER_MS);
       frameRef.current = requestAnimationFrame(measure);
     }
     frameRef.current = requestAnimationFrame(measure);
@@ -164,43 +275,54 @@ export function ProductTour({ initialCompleted }: { initialCompleted: boolean })
     return () => {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
-  }, [step, onTarget, pathname]);
+  }, [step, onTarget, pathname, setMobileNavOpen]);
 
   if (!step) return null;
 
-  function finish() {
+  // Natural completion (the analyst clicked "Finish" on the last step) -
+  // there's nothing more to see, so it drops them back on the dashboard
+  // rather than leaving them on whatever step-8 page they ended on.
+  function finishNaturally() {
     setCompleted(true);
-    // Fire-and-forget, same reasoning as the audit-trail insert in
-    // updateStartupStatus - this is a best-effort persistence write, not
-    // something the UI needs to wait on. Worst case it fails silently and
-    // the tour shows once more next session, which is a fully recoverable
-    // outcome, not a broken one.
+    void markTourCompleted();
+    router.push("/dashboard");
+  }
+
+  // An abrupt exit (the analyst clicked "Skip tour" partway through) - they
+  // were in the middle of doing something on this page before the tour
+  // interrupted them, so it leaves them exactly where they are instead of
+  // also yanking them to the dashboard.
+  function skipTour() {
+    closeStepIfNeeded(step);
+    setCompleted(true);
     void markTourCompleted();
   }
 
   function next() {
+    closeStepIfNeeded(step);
     if (stepIndex >= STEPS.length - 1) {
-      finish();
+      finishNaturally();
     } else {
       setStepIndex((i) => i + 1);
     }
   }
 
-  // Two different reasons land here, and they need different actions.
-  // !onTarget means the step needs a whole different page (the startup
-  // detail steps, before any startup has been opened) - every later step
-  // needs that same page too, so there's nothing to "skip ahead" to; the
-  // only real options are wait or bail out entirely. `stuck` means the
-  // step's page is right, but this one specific target is only tucked
-  // inside the mobile hamburger menu (see mobile-nav-menu.tsx) and it's
-  // closed - the fix here is either open the menu or move past this one
-  // step, not end the whole tour over it.
+  // !onTarget while canAutoNavigate means the navigation effect above is
+  // already carrying the analyst to the right page - render nothing while
+  // that's in flight rather than a pill asking them to do it by hand.
+  // Without a tourStartupId (no startup exists yet to point the tour at)
+  // there's genuinely nothing to navigate to, so it falls back to asking.
+  // `stuck` is the other, now-rare case: the step's page is right and the
+  // menu-open effect already fired, but the target still hasn't shown up -
+  // a last-resort skip rather than a dead end.
+  if (!onTarget && canAutoNavigate) return null;
+
   if (!onTarget || stuck) {
     return (
       <div className="fixed bottom-5 left-1/2 z-[60] w-[calc(100%-2.5rem)] max-w-xs -translate-x-1/2 rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 text-center text-sm text-amber-900 shadow-lg dark:border-amber-500 dark:bg-amber-950 dark:text-amber-100 sm:left-auto sm:right-5 sm:translate-x-0">
         <p className="font-medium">
           {onTarget
-            ? "This step is tucked in the ☰ menu - open it to see the highlight, or skip ahead."
+            ? "This step's target didn't show up - skip ahead to keep going."
             : "Open any startup to continue the tour."}
         </p>
         <div className="mt-2 flex items-center justify-center gap-3">
@@ -215,7 +337,7 @@ export function ProductTour({ initialCompleted }: { initialCompleted: boolean })
           )}
           <button
             type="button"
-            onClick={finish}
+            onClick={skipTour}
             className="text-xs underline underline-offset-2"
           >
             Skip tour
@@ -260,7 +382,7 @@ export function ProductTour({ initialCompleted }: { initialCompleted: boolean })
         <div className="flex items-center justify-between">
           <button
             type="button"
-            onClick={finish}
+            onClick={skipTour}
             className="text-xs text-zinc-500 hover:underline dark:text-zinc-400"
           >
             Skip tour

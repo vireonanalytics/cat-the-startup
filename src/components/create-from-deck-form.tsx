@@ -73,7 +73,10 @@ export function CreateFromDeckForm() {
   const pending = isUploading || isProcessing;
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-black/10 bg-white p-6 dark:border-white/10 dark:bg-zinc-950">
+    <div
+      data-tour="deck-upload-form"
+      className="flex flex-col gap-2 rounded-xl border border-black/10 bg-white p-6 dark:border-white/10 dark:bg-zinc-950"
+    >
       <h2 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
         Or create from a pitch deck
       </h2>

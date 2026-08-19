@@ -62,33 +62,6 @@ function subscribeSeen(listener: () => void) {
   return () => seenListeners.delete(listener);
 }
 
-// A first-time visitor has no way to know "Cat-ch Up" is the team's private
-// discussion thread rather than another AI surface - this is a one-time,
-// more attention-grabbing callout shown until the analyst either opens the
-// panel or explicitly dismisses it, then never again (tracked globally, not
-// per-startup, same reasoning as PurrAI's hint in mascot-companion.tsx,
-// whose exact pattern this mirrors: a tiny external store since the source
-// of truth is localStorage, not React state).
-const HINT_STORAGE_KEY = "cat-the-startup:catchup-hint-seen";
-const HINT_CAPTION =
-  "👋 Tip: this is your team's private chat — notes here are never sent to the AI review.";
-const hintListeners = new Set<() => void>();
-
-function readHintSeen(): boolean {
-  if (typeof window === "undefined") return true;
-  return localStorage.getItem(HINT_STORAGE_KEY) === "1";
-}
-
-function markHintSeen() {
-  localStorage.setItem(HINT_STORAGE_KEY, "1");
-  hintListeners.forEach((listener) => listener());
-}
-
-function subscribeHint(listener: () => void) {
-  hintListeners.add(listener);
-  return () => hintListeners.delete(listener);
-}
-
 export interface DiscussionItem {
   id: string;
   extracted_text: string | null;
@@ -167,11 +140,6 @@ export function DiscussionChat({
 
   const unreadCount = Math.max(0, items.length - seenCount);
 
-  // Server snapshot says "already seen" (no hint) for the same SSR reason
-  // as seenCount above.
-  const hintSeen = useSyncExternalStore(subscribeHint, readHintSeen, () => true);
-  const isHint = !hintSeen && !isOpen;
-
   useEffect(() => {
     if (!deletingId) return;
     return pushActivity("swiping", "Sweeping that one away…");
@@ -221,31 +189,12 @@ export function DiscussionChat({
   }
 
   const toggleButton = (
-    <div className="relative flex flex-col items-end gap-1">
-      {isHint && (
-        <div className="relative max-w-[200px] rounded-xl border-2 border-amber-400 bg-amber-50 px-3 py-2 text-left text-xs font-medium leading-snug text-amber-900 shadow-lg dark:border-amber-500 dark:bg-amber-950 dark:text-amber-100">
-          <button
-            type="button"
-            onClick={() => markHintSeen()}
-            aria-label="Dismiss tip"
-            className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] text-white shadow hover:bg-amber-600"
-          >
-            ✕
-          </button>
-          {HINT_CAPTION}
-        </div>
-      )}
+    <div data-tour="catchup-panel" className="relative flex flex-col items-end gap-1">
       <button
         type="button"
-        onClick={() => {
-          markHintSeen();
-          setIsOpen(true);
-        }}
+        onClick={() => setIsOpen(true)}
         data-tour="catchup-button"
-        className={
-          "flex items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-lg transition-colors hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900" +
-          (isHint ? " ring-4 ring-amber-300/70 animate-pulse dark:ring-amber-500/50" : "")
-        }
+        className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-lg transition-colors hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
       >
         🐾 Cat-ch Up
         {unreadCount > 0 && (
@@ -263,7 +212,10 @@ export function DiscussionChat({
     // reserved from main by the layout's real flex structure, so there's
     // no need to leave the panel narrower than the anchor as a buffer
     // against page content anymore.
-    <div className="flex max-h-[420px] w-72 flex-col overflow-hidden rounded-xl border border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-950">
+    <div
+      data-tour="catchup-panel"
+      className="flex max-h-[420px] w-72 flex-col overflow-hidden rounded-xl border border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-950"
+    >
       <div className="flex items-center justify-between gap-2 border-b border-black/10 px-4 py-3 dark:border-white/10">
         <div>
           <p className="text-sm font-semibold text-zinc-950 dark:text-zinc-50">
@@ -276,6 +228,7 @@ export function DiscussionChat({
         <button
           type="button"
           onClick={() => setIsOpen(false)}
+          data-tour="catchup-close"
           className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
           aria-label="Close"
         >

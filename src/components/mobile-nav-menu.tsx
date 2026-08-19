@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
+import { useMobileNav } from "@/components/mobile-nav-context";
 
 const LINK_CLASS =
   "rounded-md px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800";
@@ -21,7 +21,7 @@ export function MobileNavMenu({
   isAdmin: boolean;
   userEmail: string | null;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen, setIsOpen } = useMobileNav();
 
   function close() {
     setIsOpen(false);
@@ -31,7 +31,7 @@ export function MobileNavMenu({
     <div className="relative md:hidden">
       <button
         type="button"
-        onClick={() => setIsOpen((v) => !v)}
+        onClick={() => setIsOpen(!isOpen)}
         aria-label={isOpen ? "Close menu" : "Open menu"}
         aria-expanded={isOpen}
         className="flex h-9 w-9 items-center justify-center rounded-md border border-zinc-300 text-lg text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
@@ -52,12 +52,7 @@ export function MobileNavMenu({
               <Link href="/dashboard" onClick={close} className={LINK_CLASS}>
                 Dashboard
               </Link>
-              <Link
-                href="/startups/new"
-                onClick={close}
-                data-tour="add-startup-link"
-                className={LINK_CLASS}
-              >
+              <Link href="/startups/new" onClick={close} className={LINK_CLASS}>
                 Add startup
               </Link>
               <Link

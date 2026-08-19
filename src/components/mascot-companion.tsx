@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMascot } from "@/components/mascot-context";
 import { Mascot, type MascotPose } from "@/components/mascot";
 
@@ -57,44 +57,12 @@ const LONG_WAIT_MS = 60_000;
 const APOLOGY_MESSAGE = "Sorry, this is taking longer than usual — still on it!";
 const NO_ACTIVITY_ID = -1;
 
-// PurrAI has no button, label, or icon - just an idle cat with a caption -
-// so a first-time visitor has no obvious reason to click it. This is a
-// one-time, more attention-grabbing version of ASK_CAPTION shown until the
-// analyst either opens the chat or explicitly dismisses it, then never
-// again (tracked globally, not per-startup - the point is introducing the
-// feature once, not re-explaining it on every new deal). Modeled as a tiny
-// external store (see discussion-chat.tsx's identical seenCount pattern)
-// since the source of truth is localStorage, not React state.
-const HINT_STORAGE_KEY = "cat-the-startup:purrai-hint-seen";
-const HINT_CAPTION = "👋 Tip: pet me to ask AI questions about this startup!";
-const hintListeners = new Set<() => void>();
-
-function readHintSeen(): boolean {
-  if (typeof window === "undefined") return true;
-  return localStorage.getItem(HINT_STORAGE_KEY) === "1";
-}
-
-function markHintSeen() {
-  localStorage.setItem(HINT_STORAGE_KEY, "1");
-  hintListeners.forEach((listener) => listener());
-}
-
-function subscribeHint(listener: () => void) {
-  hintListeners.add(listener);
-  return () => hintListeners.delete(listener);
-}
-
 interface MascotDisplay {
   pose: MascotPose;
   /** Empty string means "nothing to say right now" - distinct from a real
    * caption, callers render nothing in that case rather than an empty
    * bubble. */
   caption: string;
-  /** True only for the one-time PurrAI discoverability hint - callers
-   * render this caption as a highlighted, dismissible callout instead of
-   * the usual plain italic text. */
-  isHint: boolean;
-  dismissHint: () => void;
   ariaLabel: string;
   handleClick: () => void;
 }
@@ -116,12 +84,6 @@ function useMascotDisplay(): MascotDisplay {
   // below, never as a direct setState call in an effect body.
   const [quipIndex, setQuipIndex] = useState(0);
   const [isLongWait, setIsLongWait] = useState(false);
-  // Server snapshot says "already seen" (no hint) - localStorage isn't
-  // readable during SSR - so the server-rendered and first-client render
-  // agree; the real persisted value then takes over immediately after, via
-  // useSyncExternalStore's built-in hydration handling (same pattern as
-  // discussion-chat.tsx's unread badge).
-  const hintSeen = useSyncExternalStore(subscribeHint, readHintSeen, () => true);
 
   useEffect(() => {
     return () => {
@@ -136,11 +98,8 @@ function useMascotDisplay(): MascotDisplay {
     return () => clearInterval(interval);
   }, []);
 
-  const isHint = !!analystChatHandler && !hintSeen && !isAnalystChatOpen;
-
   function handleClick() {
     if (analystChatHandler) {
-      markHintSeen();
       analystChatHandler();
       return;
     }
@@ -183,24 +142,18 @@ function useMascotDisplay(): MascotDisplay {
       ? { pose: "apologetic" as const, message: APOLOGY_MESSAGE }
       : real;
 
-  // A real activity/shy/apology message always wins, same as before - the
-  // hint only ever fills the idle slot, never interrupts something the cat
-  // is actually reporting.
+  // A real activity/shy/apology message always wins over any idle caption.
   const caption =
     shown.message ||
-    (isHint
-      ? HINT_CAPTION
-      : analystChatHandler && isAnalystChatOpen
-        ? ""
-        : analystChatHandler
-          ? ASK_CAPTION
-          : IDLE_QUIPS[quipIndex]);
+    (analystChatHandler && isAnalystChatOpen
+      ? ""
+      : analystChatHandler
+        ? ASK_CAPTION
+        : IDLE_QUIPS[quipIndex]);
 
   return {
     pose: shown.pose,
     caption,
-    isHint: isHint && !shown.message,
-    dismissHint: markHintSeen,
     ariaLabel: analystChatHandler ? "Pet the cat to ask about this startup" : "Pet the cat",
     handleClick,
   };
@@ -232,7 +185,7 @@ function useMascotDisplay(): MascotDisplay {
 // (app)/layout.tsx) - see MascotMobileButton below for the narrower-
 // viewport equivalent.
 export function MascotCompanion() {
-  const { pose, caption, isHint, dismissHint, ariaLabel, handleClick } = useMascotDisplay();
+  const { pose, caption, ariaLabel, handleClick } = useMascotDisplay();
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -241,36 +194,20 @@ export function MascotCompanion() {
         onClick={handleClick}
         aria-label={ariaLabel}
         data-tour="purrai-cat"
-        className={
-          "cursor-pointer rounded-full transition-transform hover:scale-105 active:scale-95" +
-          (isHint ? " ring-4 ring-amber-300/70 animate-pulse dark:ring-amber-500/50" : "")
-        }
+        className="cursor-pointer rounded-full transition-transform hover:scale-105 active:scale-95"
       >
         <div key={pose} className={`mascot-pose mascot-pose-${pose} drop-shadow-lg`}>
           <Mascot pose={pose} size={160} priority />
         </div>
       </button>
-      {caption &&
-        (isHint ? (
-          <div className="relative w-full max-w-[170px] rounded-xl border-2 border-amber-400 bg-amber-50 px-3 py-2 text-center text-xs font-medium leading-snug text-amber-900 shadow-lg dark:border-amber-500 dark:bg-amber-950 dark:text-amber-100">
-            <button
-              type="button"
-              onClick={dismissHint}
-              aria-label="Dismiss tip"
-              className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] text-white shadow hover:bg-amber-600"
-            >
-              ✕
-            </button>
-            {caption}
-          </div>
-        ) : (
-          <p
-            key={caption}
-            className="quip-fade w-full max-w-[160px] text-center text-sm italic leading-snug text-zinc-500 dark:text-zinc-300"
-          >
-            {caption}
-          </p>
-        ))}
+      {caption && (
+        <p
+          key={caption}
+          className="quip-fade w-full max-w-[160px] text-center text-sm italic leading-snug text-zinc-500 dark:text-zinc-300"
+        >
+          {caption}
+        </p>
+      )}
     </div>
   );
 }
@@ -288,40 +225,24 @@ export function MascotCompanion() {
 // easter egg everywhere else - just from a smaller resting size so it
 // doesn't crowd the page.
 export function MascotMobileButton() {
-  const { pose, caption, isHint, dismissHint, ariaLabel, handleClick } = useMascotDisplay();
+  const { pose, caption, ariaLabel, handleClick } = useMascotDisplay();
 
   return (
     <div className="fixed bottom-5 left-5 z-40 flex flex-col items-center gap-1 lg:hidden">
-      {caption &&
-        (isHint ? (
-          <div className="relative max-w-[170px] rounded-lg border-2 border-amber-400 bg-amber-50 px-2 py-1.5 text-center text-[11px] font-medium leading-snug text-amber-900 shadow-md dark:border-amber-500 dark:bg-amber-950 dark:text-amber-100">
-            <button
-              type="button"
-              onClick={dismissHint}
-              aria-label="Dismiss tip"
-              className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] text-white shadow hover:bg-amber-600"
-            >
-              ✕
-            </button>
-            {caption}
-          </div>
-        ) : (
-          <p
-            key={caption}
-            className="quip-fade max-w-[160px] rounded-lg bg-white/90 px-2 py-1 text-center text-xs italic leading-snug text-zinc-600 shadow-md backdrop-blur-sm dark:bg-zinc-900/90 dark:text-zinc-300"
-          >
-            {caption}
-          </p>
-        ))}
+      {caption && (
+        <p
+          key={caption}
+          className="quip-fade max-w-[160px] rounded-lg bg-white/90 px-2 py-1 text-center text-xs italic leading-snug text-zinc-600 shadow-md backdrop-blur-sm dark:bg-zinc-900/90 dark:text-zinc-300"
+        >
+          {caption}
+        </p>
+      )}
       <button
         type="button"
         onClick={handleClick}
         aria-label={ariaLabel}
         data-tour="purrai-cat"
-        className={
-          "cursor-pointer rounded-full shadow-lg transition-transform active:scale-95" +
-          (isHint ? " ring-4 ring-amber-300/70 animate-pulse dark:ring-amber-500/50" : "")
-        }
+        className="cursor-pointer rounded-full shadow-lg transition-transform active:scale-95"
       >
         <div key={pose} className={`mascot-pose mascot-pose-${pose} drop-shadow-lg`}>
           <Mascot pose={pose} size={64} priority />
