@@ -720,3 +720,71 @@ create policy "users can update their own tour_completed flag"
   to authenticated
   using (auth.uid() = id)
   with check (auth.uid() = id);
+
+-- ---------------------------------------------------------------------------
+-- Step 18: manually-added founder LinkedIn links
+-- ---------------------------------------------------------------------------
+
+-- FoundersChip (startup-header.tsx) shows a LinkedIn link per founder only
+-- when public research happened to surface one - "No LinkedIn found" left
+-- an analyst who already knows the right profile with nothing to click. A
+-- separate table rather than a column on enrichment_findings: that row is
+-- wholesale replaced every time "Refresh research" runs, so a manual
+-- addition living there would silently vanish on the next refresh.
+create table if not exists public.founder_links (
+  id uuid primary key default gen_random_uuid(),
+  startup_id uuid not null references public.startups (id) on delete cascade,
+  founder_name text not null,
+  linkedin_url text not null,
+  added_by uuid references public.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique (startup_id, founder_name)
+);
+
+create index if not exists founder_links_startup_id_idx on public.founder_links (startup_id);
+
+alter table public.founder_links enable row level security;
+
+drop policy if exists "team members can view team founder links" on public.founder_links;
+create policy "team members can view team founder links"
+  on public.founder_links for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.startups s
+      where s.id = founder_links.startup_id and s.team_id = public.current_team_id()
+    )
+  );
+
+drop policy if exists "team members can add founder links for team startups" on public.founder_links;
+create policy "team members can add founder links for team startups"
+  on public.founder_links for insert
+  to authenticated
+  with check (
+    exists (
+      select 1 from public.startups s
+      where s.id = founder_links.startup_id and s.team_id = public.current_team_id()
+    )
+  );
+
+drop policy if exists "team members can update team founder links" on public.founder_links;
+create policy "team members can update team founder links"
+  on public.founder_links for update
+  to authenticated
+  using (
+    exists (
+      select 1 from public.startups s
+      where s.id = founder_links.startup_id and s.team_id = public.current_team_id()
+    )
+  );
+
+drop policy if exists "team members can delete team founder links" on public.founder_links;
+create policy "team members can delete team founder links"
+  on public.founder_links for delete
+  to authenticated
+  using (
+    exists (
+      select 1 from public.startups s
+      where s.id = founder_links.startup_id and s.team_id = public.current_team_id()
+    )
+  );

@@ -167,6 +167,14 @@ export default async function StartupDetailPage({
     .limit(1)
     .maybeSingle();
 
+  // Analyst-added links (see FoundersChip in startup-header.tsx) - kept
+  // separate from key_findings above since that row is wholesale replaced
+  // by every "Refresh research" run, which would silently wipe these.
+  const { data: founderLinks } = await supabase
+    .from("founder_links")
+    .select("founder_name, linkedin_url")
+    .eq("startup_id", id);
+
   return (
     <div className="flex gap-6">
       {/* No max-w cap - main (see (app)/layout.tsx) is now a real flex-1
@@ -192,6 +200,7 @@ export default async function StartupDetailPage({
           lastRoundSummary={enrichment?.last_round_summary ?? null}
           contradictionsCount={activeContradictionsCount}
           keyFindings={enrichment?.key_findings ?? []}
+          founderLinks={founderLinks ?? []}
         />
 
         <ReviewRegenerationProvider

@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { updateStartup } from "@/app/(app)/startups/[id]/actions";
+import {
+  updateStartup,
+  addFounderLinkedIn,
+  removeFounderLinkedIn,
+} from "@/app/(app)/startups/[id]/actions";
 import { StatusForm } from "@/components/status-form";
 import { StatusHistory } from "@/components/status-history";
 import { ExportMemoButton } from "@/components/export-memo-button";
@@ -30,8 +34,8 @@ function parseFounders(founderNames: string | null): string[] {
 // already surfaced for this startup (see enrichStartup in actions.ts, which
 // discards any URL the search results didn't actually return) - never a
 // guessed or constructed URL. If public research never found a founder's
-// LinkedIn, this returns null and the founder is shown with no link, rather
-// than a search-engine shortcut dressed up as "their LinkedIn."
+// LinkedIn, this returns null; the analyst can add one by hand instead (see
+// FounderLinkedInCell), which takes priority over this when both exist.
 function findFounderLinkedIn(name: string, keyFindings: KeyFinding[]): string | null {
   const needle = name.toLowerCase();
   const match = keyFindings.find(
@@ -71,15 +75,147 @@ function DomainChip({ domain }: { domain: string | null }) {
   );
 }
 
+// The LinkedIn slot for one founder row in the popover below - three
+// states: a link (from research or manually added, manual takes priority
+// and gets a remove control since it's the analyst's own entry), an inline
+// "add it yourself" form, or the "+ Add LinkedIn" trigger for that form.
+// Self-contained (its own pending/error state) so one founder's in-flight
+// save or typo doesn't affect any other row in the same list.
+function FounderLinkedInCell({
+  startupId,
+  founderName,
+  linkedIn,
+  isManual,
+}: {
+  startupId: string;
+  founderName: string;
+  linkedIn: string | null;
+  isManual: boolean;
+}) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!value.trim()) return;
+    setError(null);
+    const formData = new FormData();
+    formData.set("startup_id", startupId);
+    formData.set("founder_name", founderName);
+    formData.set("linkedin_url", value.trim());
+
+    startTransition(async () => {
+      const result = await addFounderLinkedIn(formData);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      setIsAdding(false);
+      setValue("");
+    });
+  }
+
+  function handleRemove() {
+    const formData = new FormData();
+    formData.set("startup_id", startupId);
+    formData.set("founder_name", founderName);
+    startTransition(() => removeFounderLinkedIn(formData));
+  }
+
+  if (linkedIn) {
+    return (
+      <span className="flex shrink-0 items-center gap-1.5">
+        <a
+          href={linkedIn}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs font-medium text-blue-700 underline-offset-2 hover:underline dark:text-blue-400"
+        >
+          LinkedIn
+        </a>
+        {isManual && (
+          <button
+            type="button"
+            onClick={handleRemove}
+            disabled={isPending}
+            aria-label={`Remove ${founderName}'s LinkedIn link`}
+            className="text-zinc-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-600 dark:hover:text-red-400"
+          >
+            ✕
+          </button>
+        )}
+      </span>
+    );
+  }
+
+  if (isAdding) {
+    return (
+      <form onSubmit={handleSubmit} className="flex shrink-0 flex-col items-end gap-1">
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            autoFocus
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            placeholder="linkedin.com/in/…"
+            disabled={isPending}
+            className="w-32 rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-xs text-zinc-950 outline-none focus:border-zinc-500 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50"
+          />
+          <button
+            type="submit"
+            disabled={isPending || !value.trim()}
+            className="text-xs font-medium text-zinc-700 hover:underline disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-300"
+          >
+            {isPending ? "…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsAdding(false);
+              setError(null);
+            }}
+            disabled={isPending}
+            className="text-xs text-zinc-400 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-600 dark:hover:text-zinc-200"
+          >
+            Cancel
+          </button>
+        </div>
+        {error && (
+          <span className="text-xs text-red-600 dark:text-red-400">{error}</span>
+        )}
+      </form>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setIsAdding(true)}
+      className="shrink-0 text-xs text-zinc-400 underline-offset-2 hover:text-zinc-700 hover:underline dark:text-zinc-600 dark:hover:text-zinc-200"
+    >
+      + Add LinkedIn
+    </button>
+  );
+}
+
 function FoundersChip({
+  startupId,
   founderNames,
   keyFindings,
+  founderLinks,
 }: {
+  startupId: string;
   founderNames: string | null;
   keyFindings: KeyFinding[];
+  founderLinks: { founder_name: string; linkedin_url: string }[];
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const founders = parseFounders(founderNames);
+  const manualLinks = new Map(
+    founderLinks.map((link) => [link.founder_name, link.linkedin_url])
+  );
 
   if (founders.length === 0) {
     return <Chip label="Founders" value="—" />;
@@ -107,30 +243,23 @@ function FoundersChip({
             onClick={() => setIsOpen(false)}
             className="fixed inset-0 z-40 cursor-default"
           />
-          <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-black/10 bg-white p-2 text-left shadow-lg dark:border-white/10 dark:bg-zinc-900">
+          <div className="absolute left-0 top-full z-50 mt-2 w-72 rounded-lg border border-black/10 bg-white p-2 text-left shadow-lg dark:border-white/10 dark:bg-zinc-900">
             <ul className="flex flex-col">
               {founders.map((name) => {
-                const linkedIn = findFounderLinkedIn(name, keyFindings);
+                const manual = manualLinks.get(name) ?? null;
+                const linkedIn = manual ?? findFounderLinkedIn(name, keyFindings);
                 return (
                   <li
                     key={name}
                     className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-700 dark:text-zinc-300"
                   >
-                    <span>{name}</span>
-                    {linkedIn ? (
-                      <a
-                        href={linkedIn}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="shrink-0 text-xs font-medium text-blue-700 underline-offset-2 hover:underline dark:text-blue-400"
-                      >
-                        LinkedIn
-                      </a>
-                    ) : (
-                      <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-600">
-                        No LinkedIn found
-                      </span>
-                    )}
+                    <span className="truncate">{name}</span>
+                    <FounderLinkedInCell
+                      startupId={startupId}
+                      founderName={name}
+                      linkedIn={linkedIn}
+                      isManual={manual != null}
+                    />
                   </li>
                 );
               })}
@@ -189,11 +318,13 @@ export function StartupHeader({
   lastRoundSummary,
   contradictionsCount,
   keyFindings,
+  founderLinks,
 }: {
   startup: StartupHeaderInfo;
   lastRoundSummary: string | null;
   contradictionsCount: number | null;
   keyFindings: KeyFinding[];
+  founderLinks: { founder_name: string; linkedin_url: string }[];
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -368,8 +499,10 @@ export function StartupHeader({
               <Chip label="Last round" value={lastRoundSummary} />
             )}
             <FoundersChip
+              startupId={startup.id}
               founderNames={startup.founder_names}
               keyFindings={keyFindings}
+              founderLinks={founderLinks}
             />
             {contradictionsCount != null && (
               <Chip

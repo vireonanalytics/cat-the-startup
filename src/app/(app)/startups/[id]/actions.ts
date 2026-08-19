@@ -1074,6 +1074,81 @@ export async function updateStartup(
   revalidatePath("/dashboard");
 }
 
+// Manually-added founder LinkedIn links (see founder_links in schema.sql,
+// Step 18). Public research (see enrichStartup) only surfaces a link when
+// it happens to find one - an analyst who already knows the right profile
+// had no way to add it themselves, just a dead "No LinkedIn found" label
+// (see FoundersChip in startup-header.tsx). Upserted on (startup_id,
+// founder_name) so re-adding one corrects it rather than erroring on the
+// unique constraint.
+export async function addFounderLinkedIn(
+  formData: FormData
+): Promise<{ error: string } | void> {
+  const startupId = String(formData.get("startup_id") ?? "");
+  const founderName = String(formData.get("founder_name") ?? "").trim();
+  const linkedinUrlRaw = String(formData.get("linkedin_url") ?? "").trim();
+
+  if (!startupId || !founderName || !linkedinUrlRaw) {
+    return { error: "Missing required fields." };
+  }
+
+  let url: URL;
+  try {
+    url = new URL(
+      /^https?:\/\//i.test(linkedinUrlRaw)
+        ? linkedinUrlRaw
+        : `https://${linkedinUrlRaw}`
+    );
+  } catch {
+    return { error: "That doesn't look like a valid URL." };
+  }
+
+  if (!/(^|\.)linkedin\.com$/i.test(url.hostname)) {
+    return { error: "That doesn't look like a LinkedIn URL." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { error } = await supabase.from("founder_links").upsert(
+    {
+      startup_id: startupId,
+      founder_name: founderName,
+      linkedin_url: url.toString(),
+      added_by: user.id,
+    },
+    { onConflict: "startup_id,founder_name" }
+  );
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/startups/${startupId}`);
+}
+
+export async function removeFounderLinkedIn(formData: FormData) {
+  const startupId = String(formData.get("startup_id") ?? "");
+  const founderName = String(formData.get("founder_name") ?? "");
+
+  if (!startupId || !founderName) return;
+
+  const supabase = await createClient();
+  await supabase
+    .from("founder_links")
+    .delete()
+    .eq("startup_id", startupId)
+    .eq("founder_name", founderName);
+
+  revalidatePath(`/startups/${startupId}`);
+}
+
 // Removes the deck's storage objects (the uploaded PDF and its rendered page
 // images) alongside the `documents` row, so a deck that's no longer
 // relevant doesn't linger in Storage. Past reviews are left as historical

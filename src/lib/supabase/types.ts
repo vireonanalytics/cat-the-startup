@@ -272,6 +272,48 @@ export interface Database {
           },
         ];
       };
+      founder_links: {
+        Row: {
+          id: string;
+          startup_id: string;
+          founder_name: string;
+          linkedin_url: string;
+          added_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          startup_id: string;
+          founder_name: string;
+          linkedin_url: string;
+          added_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          startup_id?: string;
+          founder_name?: string;
+          linkedin_url?: string;
+          added_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "founder_links_startup_id_fkey";
+            columns: ["startup_id"];
+            isOneToOne: false;
+            referencedRelation: "startups";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "founder_links_added_by_fkey";
+            columns: ["added_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       reviews: {
         Row: {
           id: string;
