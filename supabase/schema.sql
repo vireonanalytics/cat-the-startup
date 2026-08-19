@@ -788,3 +788,17 @@ create policy "team members can delete team founder links"
       where s.id = founder_links.startup_id and s.team_id = public.current_team_id()
     )
   );
+
+-- ---------------------------------------------------------------------------
+-- Step 19: "No live opportunity" verdict, distinct from Pass
+-- ---------------------------------------------------------------------------
+
+-- A review on an old deck for a company that's since IPO'd or been
+-- acquired was landing on "Pass" - correct in that there's genuinely
+-- nothing to invest in, but indistinguishable from "we evaluated this and
+-- it's weak," which it usually wasn't. This is a statement about timing
+-- (the round already closed), not quality - see buildReviewPrompt in
+-- actions.ts for when the model is instructed to use it instead of Pass.
+alter table public.reviews drop constraint if exists reviews_verdict_check;
+alter table public.reviews add constraint reviews_verdict_check
+  check (verdict is null or verdict in ('Strong yes', 'Promising', 'Needs diligence', 'Weak fit', 'Pass', 'No live opportunity'));

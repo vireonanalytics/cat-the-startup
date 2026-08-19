@@ -9,7 +9,8 @@ export type Verdict =
   | "Promising"
   | "Needs diligence"
   | "Weak fit"
-  | "Pass";
+  | "Pass"
+  | "No live opportunity";
 
 export interface ReviewPoint {
   point: string;

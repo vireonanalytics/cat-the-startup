@@ -20,6 +20,11 @@ function verdictClass(verdict: Verdict): string {
     case "Weak fit":
     case "Pass":
       return "border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-400";
+    // Deliberately not red like Weak fit/Pass - this isn't a judgment on
+    // the company (see buildReviewPrompt), just a factual state that reads
+    // as one at a glance if it shares their color.
+    case "No live opportunity":
+      return "border-zinc-300 bg-zinc-100 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
   }
 }
 
