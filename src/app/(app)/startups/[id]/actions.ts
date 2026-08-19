@@ -69,7 +69,7 @@ const REVIEW_SCHEMA = {
       type: "string",
       enum: [...VERDICTS],
       description:
-        "Your bottom-line call, worst to best: \"Pass\", \"Weak fit\", \"Needs diligence\", \"Promising\", \"Strong yes\". Base it only on what the evidence actually shows, not on how the company presents itself. Use \"No live opportunity\" instead of any of those - regardless of how strong the deck itself looks - if public research shows this specific round is no longer open: the company has since IPO'd, been acquired, shut down, or otherwise moved on from fundraising at this stage. That's a statement about timing, not quality.",
+        "Your bottom-line call, worst to best: \"Pass\", \"Weak fit\", \"Needs diligence\", \"Promising\", \"Strong yes\". Judge the opportunity itself - team, traction, market position, deal terms - exactly as you would if this deck landed today. If public research shows this specific round has since closed (the company IPO'd, was acquired, shut down, or otherwise moved on), that's a fact about availability, not quality - note it in why_not (see that field's description), but don't let it drag down an otherwise strong verdict. A great company whose round happens to be closed is still \"Strong yes\" or \"Promising\" on the merits, not \"Pass.\"",
     },
     thesis: {
       type: "string",
@@ -106,7 +106,7 @@ const REVIEW_SCHEMA = {
     why_not: {
       type: "array",
       description:
-        "The 3-5 most important reasons for caution, ranked most important first, same one-sentence-plus-citation format as why_invest.",
+        "The 3-5 most important reasons for caution, ranked most important first, same one-sentence-plus-citation format as why_invest. If public research shows this specific round has already closed (the company has since IPO'd, been acquired, shut down, or otherwise stopped raising at this stage), always include that as one point here, citing the research - e.g. \"No live round to invest in - Public research: acquired by Microsoft in 2016 for $26.2B.\" That's the one place this fact belongs; it's about availability, not a mark against the company.",
       items: {
         type: "object",
         properties: {
@@ -190,9 +190,9 @@ Every citation must name its source, briefly:
 
 Keep every point and every citation to one short sentence - this review is read in a hurry. If a point needs two sentences to explain, it's two points.
 
-Lead with your bottom line: a "verdict" and a one-sentence "thesis" - the single most important thing to know before reading further. Base both only on the evidence itself, not on how the company presents itself.
+Lead with your bottom line: a "verdict" and a one-sentence "thesis" - the single most important thing to know before reading further. Base both on the merits of the opportunity itself - team, traction, market, deal terms - not on how the company presents itself, and not on whether the round happens to still be open. Judge it as if this deck landed on your desk today: a company that was clearly a great bet doesn't become "Pass" material just because you're looking at it after the fact.
 
-If public research shows this specific round is no longer open - the company has since IPO'd, been acquired, shut down, or otherwise moved on from raising at this stage - the verdict is "No live opportunity" regardless of how strong the deck itself looks, and the thesis should say so plainly (e.g. "LinkedIn's 2004 Series B - the company IPO'd in 2011 and was acquired by Microsoft in 2016, so there's nothing to invest in today"). Don't downgrade a strong deck to "Pass" or "Weak fit" just because the round has closed - those verdicts mean the opportunity itself was weak, which a deck like that wasn't. Still give the deck a full, honest why_invest/why_not on its own terms underneath that verdict - a partner reading this should come away knowing both "there's no deal here" and "here's how good this company actually was at the time."
+If public research shows this specific round has since closed - the company IPO'd, was acquired, shut down, or otherwise stopped raising at this stage - that's a fact about availability, not quality, and it belongs in why_not, not in the verdict (see that field's description). The thesis can mention it in passing if it's genuinely the most important thing to know (e.g. a deck for a company that's since gone public), but the verdict itself should still reflect how good the opportunity actually was.
 
 Pay close attention to discrepancies between your sources - the deck states one figure and a call gives another, a claimed milestone is cast in doubt, or a deck/evidence claim conflicts with public research (e.g. a claimed funding status doesn't match what research found, or a founder's background doesn't match what's publicly documented). A real contradiction is two sources disagreeing about the same point in time - not a deck's claim about its own state *when it was written* (pre-revenue, currently raising, its stage) being "contradicted" by public research showing what happened to the company *since*. A startup being further along today than an old deck describes is normal progress, not a misrepresentation - don't list it as a contradiction. List every real case in "contradictions", citing what each side says using the same sourcing convention as evidence citations. Leave it as an empty array if you find no real contradictions - do not manufacture one.
 
