@@ -872,22 +872,22 @@ export async function processNewDeckAndExtractStartupInfo(
 
   const client = createAnthropicClient();
 
-  // Kicked off alongside extraction (not after it) for two reasons: the
-  // review reads the deck's page images fresh from storage itself, so it
-  // has no real dependency on the extracted name/sector/etc:, and running
-  // them concurrently means an analyst waits max(extraction, review)
-  // instead of their sum - previously this call was missing here entirely,
-  // so a startup created from a deck sat with no review until someone
-  // noticed and clicked Regenerate by hand. Calls runReviewGeneration
-  // directly rather than through maybeAutoRegenerateReview - that helper
-  // deliberately skips the *first* review (see shouldAutoRegenerateReview),
-  // which is exactly backwards here: this path's whole point is generating
-  // that first review, not keeping an existing one in sync. allSettled
-  // rather than Promise.all because a failure on either side should still
-  // let the other one's result stand, not take the whole request down
-  // with it.
-  const [extractionSettled, reviewSettled] = await Promise.allSettled([
-    client.messages.create({
+  // The actual review generation is deliberately NOT run here. It used to
+  // be (first missing entirely, then run inline via Promise.allSettled
+  // alongside extraction), but that meant an analyst sat on the *upload*
+  // page watching a single "reading" cat for the full 30-90s a review
+  // takes, with no visible distinction between "still reading the deck"
+  // and "now writing the review" - and no page to actually watch it land
+  // on. Every redirect below instead sends the analyst straight to the new
+  // startup's own page with ?autogen=1, where GenerateReviewForm submits
+  // itself on mount - the exact same code path (and mascot activity
+  // syncing) as clicking "Generate Review" by hand, just automatic. Extract
+  // first, then redirect, then generate: the analyst sees the page and its
+  // extracted fields immediately, and watches the review write itself in
+  // place instead of waiting through a blank screen for both to finish.
+  let response;
+  try {
+    response = await client.messages.create({
       // This is a mechanical "copy down what's literally printed on the
       // slide" task, not an analytical one - Opus's extra reasoning depth
       // (used for the actual review, where it matters) doesn't buy anything
@@ -915,40 +915,25 @@ export async function processNewDeckAndExtractStartupInfo(
           ],
         },
       ],
-    }),
-    runReviewGeneration(supabase, startupId),
-  ]);
-
-  if (reviewSettled.status === "rejected") {
-    console.error(
-      "Auto review generation failed during deck-based startup creation:",
-      reviewSettled.reason
-    );
-  } else if ("error" in reviewSettled.value) {
-    console.error(
-      "Auto review generation failed during deck-based startup creation:",
-      reviewSettled.value.error
-    );
-  }
-
-  if (extractionSettled.status === "rejected") {
-    console.error("Startup info extraction failed:", extractionSettled.reason);
+    });
+  } catch (err) {
+    console.error("Startup info extraction failed:", err);
     // Extraction failing shouldn't block the startup from being created
     // with its deck attached - the analyst can fill the rest in by hand
     // via Edit. Surfaced as an error banner rather than failing silently,
     // so a blank card doesn't look like the deck just had no info in it.
+    // Still autogen=1: the deck itself ingested fine, and the review reads
+    // it directly rather than depending on anything extraction produces.
     revalidatePath(`/startups/${startupId}`);
     redirect(
-      `/startups/${startupId}?error=${encodeURIComponent("The deck was attached, but automatic info extraction failed - fill in the fields by hand using Edit.")}`
+      `/startups/${startupId}?autogen=1&error=${encodeURIComponent("The deck was attached, but automatic info extraction failed - fill in the fields by hand using Edit.")}`
     );
   }
-
-  const response = extractionSettled.value;
 
   if (response.stop_reason === "refusal") {
     revalidatePath(`/startups/${startupId}`);
     redirect(
-      `/startups/${startupId}?error=${encodeURIComponent("The deck was attached, but the model declined to extract its info - fill in the fields by hand using Edit.")}`
+      `/startups/${startupId}?autogen=1&error=${encodeURIComponent("The deck was attached, but the model declined to extract its info - fill in the fields by hand using Edit.")}`
     );
   }
 
@@ -999,7 +984,7 @@ export async function processNewDeckAndExtractStartupInfo(
       console.error("Could not parse extracted startup info:", err);
       revalidatePath(`/startups/${startupId}`);
       redirect(
-        `/startups/${startupId}?error=${encodeURIComponent("The deck was attached, but automatic info extraction failed to parse - fill in the fields by hand using Edit.")}`
+        `/startups/${startupId}?autogen=1&error=${encodeURIComponent("The deck was attached, but automatic info extraction failed to parse - fill in the fields by hand using Edit.")}`
       );
     }
   } else {
@@ -1014,7 +999,7 @@ export async function processNewDeckAndExtractStartupInfo(
     );
     revalidatePath(`/startups/${startupId}`);
     redirect(
-      `/startups/${startupId}?error=${encodeURIComponent("The deck was attached, but automatic info extraction didn't return anything usable - fill in the fields by hand using Edit.")}`
+      `/startups/${startupId}?autogen=1&error=${encodeURIComponent("The deck was attached, but automatic info extraction didn't return anything usable - fill in the fields by hand using Edit.")}`
     );
   }
 
@@ -1038,12 +1023,12 @@ export async function processNewDeckAndExtractStartupInfo(
 
     if (duplicates && duplicates.length > 0) {
       redirect(
-        `/startups/${startupId}?error=${encodeURIComponent(`A startup named "${extractedName}" already exists on your team. If this is the same company, delete one of them to avoid a duplicate.`)}`
+        `/startups/${startupId}?autogen=1&error=${encodeURIComponent(`A startup named "${extractedName}" already exists on your team. If this is the same company, delete one of them to avoid a duplicate.`)}`
       );
     }
   }
 
-  redirect(`/startups/${startupId}`);
+  redirect(`/startups/${startupId}?autogen=1`);
 }
 
 export async function updateStartup(

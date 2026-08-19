@@ -26,10 +26,16 @@ export function ReviewPanel({
   startupId,
   hasDeck,
   versions,
+  autoTrigger = false,
 }: {
   startupId: string;
   hasDeck: boolean;
   versions: ReviewVersionData[];
+  /** True right after a deck-based startup creation redirects here (see
+   * processNewDeckAndExtractStartupInfo's ?autogen=1) - has
+   * GenerateReviewForm submit itself on mount instead of waiting for a
+   * click, since this is always a brand-new startup with no review yet. */
+  autoTrigger?: boolean;
 }) {
   const latest = versions[0] ?? null;
 
@@ -108,6 +114,7 @@ export function ReviewPanel({
               startupId={startupId}
               hasDeck={hasDeck}
               hasReview={Boolean(latest)}
+              autoTrigger={autoTrigger}
             />
           )}
         </div>

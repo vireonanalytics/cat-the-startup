@@ -1,0 +1,28 @@
+"use client";
+
+import { useState } from "react";
+
+// Covers every ?error= message landed on this page (extraction failures,
+// the duplicate-name warning, etc.) - previously a bare server-rendered
+// div with no way to close it. An analyst who deliberately wants a second
+// entry for the same company (different materials, a later round) has no
+// reason to keep a stale "already exists" warning pinned to the page once
+// they've read it.
+export function ErrorBanner({ message }: { message: string }) {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+
+  return (
+    <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+      <span>{message}</span>
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        aria-label="Dismiss"
+        className="shrink-0 text-red-400 hover:text-red-700 dark:text-red-500 dark:hover:text-red-200"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}

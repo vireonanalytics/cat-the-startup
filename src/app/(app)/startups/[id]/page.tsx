@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { StartupHeader } from "@/components/startup-header";
 import { GraveyardNote } from "@/components/graveyard-note";
+import { ErrorBanner } from "@/components/error-banner";
 import { StartupTabs } from "@/components/startup-tabs";
 import { ReviewPanel } from "@/components/review-panel";
 import { DeckPanel } from "@/components/deck-panel";
@@ -51,10 +52,14 @@ export default async function StartupDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; graveyard?: string }>;
+  searchParams: Promise<{ error?: string; graveyard?: string; autogen?: string }>;
 }) {
   const { id } = await params;
-  const { error: errorParam, graveyard: graveyardParam } = await searchParams;
+  const {
+    error: errorParam,
+    graveyard: graveyardParam,
+    autogen: autogenParam,
+  } = await searchParams;
 
   const supabase = await createClient();
   const { data: startup, error } = await supabase
@@ -180,11 +185,7 @@ export default async function StartupDetailPage({
 
         {graveyardParam && <GraveyardNote />}
 
-        {errorParam && (
-          <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-            {errorParam}
-          </div>
-        )}
+        {errorParam && <ErrorBanner message={errorParam} />}
 
         <StartupHeader
           startup={startup}
@@ -203,6 +204,7 @@ export default async function StartupDetailPage({
                 startupId={startup.id}
                 hasDeck={Boolean(deck)}
                 versions={versions}
+                autoTrigger={autogenParam === "1"}
               />
             }
             deck={<DeckPanel startupId={startup.id} deck={deck ?? null} />}
