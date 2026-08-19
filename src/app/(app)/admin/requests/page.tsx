@@ -3,6 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 import { SignupRequestActions } from "@/components/signup-request-actions";
 import { Mascot } from "@/components/mascot";
 
+// timeZone: "UTC" pinned explicitly - without it, this renders using
+// whatever timezone the runtime happens to be in, which differs between
+// Vercel's servers and a browser's local timezone. Client components
+// hitting that mismatch between their server-rendered HTML and what the
+// browser computes on hydration is a real, reproduced bug (React error
+// #418) - pinned here too even though this particular file is a Server
+// Component with no hydration step of its own, so every formatDate in the
+// app agrees on the same convention rather than drifting file by file.
 function formatDate(value: string) {
   return new Date(value).toLocaleString("en-US", {
     year: "numeric",
@@ -10,6 +18,7 @@ function formatDate(value: string) {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: "UTC",
   });
 }
 

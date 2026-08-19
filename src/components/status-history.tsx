@@ -10,11 +10,17 @@ function statusLabel(value: string | null): string {
   return STATUS_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
 
+// timeZone: "UTC" pinned so this always agrees with what the server
+// rendered - without it, server (Vercel, UTC) and a browser in a
+// different timezone can disagree on which calendar date a timestamp near
+// midnight UTC falls on, which is a real, reproduced hydration mismatch
+// (React error #418).
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: "UTC",
   });
 }
 
