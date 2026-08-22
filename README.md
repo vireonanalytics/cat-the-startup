@@ -34,7 +34,3 @@ src/components/          UI components (review, research, evidence, chat, mascot
 src/lib/                 Supabase clients, Claude prompts/schemas, shared types and constants
 supabase/schema.sql      Full database schema (tables, RLS policies, triggers)
 ```
-
-## Ownership
-
-A Vireon Analytics LLC product. Private repository - not open for external contributions.
