@@ -27,7 +27,7 @@ Live at [cat-the-startup.vercel.app](https://cat-the-startup.vercel.app).
 ## Project structure
 
 ```
-src/app/(app)/          Authenticated app shell (dashboard, startup detail, passed, admin)
+src/app/(app)/           Authenticated app shell (dashboard, startup detail, passed, admin)
 src/app/login/           Sign-in
 src/app/request-access/  Invite-only signup + admin approval flow
 src/components/          UI components (review, research, evidence, chat, mascot, product tour)
